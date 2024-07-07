@@ -5,3 +5,5 @@ include(../../conan/opt/msvc-address-sanitizer)
 [settings]
 build_type=Release
 
+[options]
+joltphysics*:disable_allocator=True

@@ -7,3 +7,5 @@ include(../../conan/opt/linux-undefined-sanitizer)
 [settings]
 build_type=Release
 
+[options]
+joltphysics*:disable_allocator=True

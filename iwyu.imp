@@ -39,6 +39,7 @@
   { include: [ "<bits/types/struct_tm.h>", private, "<time.h>", public ] },
   { include: [ "<bits/types/time_t.h>", private, "<time.h>", public ] },
   { include: [ "<bits/utility.h>", private, "<utility>", public ] },
+  { include: [ "<__stdarg_va_arg.h>", private, "<cstdarg>", public ] },
   
   # Catch2 aliases
   { include: [ "<catch2/catch_message.hpp>", public, "<catch2/catch_test_macros.hpp>", public ] },
@@ -75,7 +76,4 @@
 
   # EnTT aliases
   { include: ["@<entt/.*>", private, "<entt/entt.hpp>", public] },
-
-  # bullet3 aliases
-  { symbol: ["btScalar", private, "<LinearMath/btScalar.h>", public] }
 ]

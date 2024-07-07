@@ -2,6 +2,9 @@ add_executable(soil)
 
 target_sources(soil
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/physics_engine.hpp
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/physics_engine.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/soil.m.cpp
 )
 

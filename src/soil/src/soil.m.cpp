@@ -1,3 +1,5 @@
+#include <physics_engine.hpp>
+
 #include <cppext_numeric.hpp>
 
 #include <sdl_window.hpp>
@@ -55,6 +57,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
         512,
         512};
 
+    soil::physics_engine physics_engine;
+
     auto context{vkrndr::create_context(&window, enable_validation_layers)};
     auto device{vkrndr::create_device(context)};
     {
@@ -97,6 +101,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
             if (do_fixed_update)
             {
                 last_fixed_tick = current_tick;
+                physics_engine.fixed_update(fixed_delta);
             }
             renderer.end_frame();
         }
