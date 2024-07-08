@@ -20,7 +20,6 @@ Note: Override packages from Conan Center with updated ones from [jan-kelemen/co
 ```
 git clone git@github.com:jan-kelemen/conan-recipes.git
 conan export conan-recipes/recipes/freetype/meson --version 2.13.2
-conan export conan-recipes/recipes/joltphysics/all --version 5.0.0
 conan export conan-recipes/recipes/sdl/all --version 2.30.4
 conan export conan-recipes/recipes/spdlog/all --version 1.14.1
 conan export conan-recipes/recipes/tinygltf/all --version 2.9.0

@@ -12,12 +12,12 @@ class SoilConan(ConanFile):
 
     def requirements(self):
         self.requires("boost/1.85.0")
+        self.requires("bullet3/3.25")
         self.requires("entt/3.13.0")
         self.requires("fmt/11.0.0")
         self.requires("freetype/2.13.2")
         self.requires("glm/cci.20230113")
         self.requires("imgui/1.90.8-docking")
-        self.requires("joltphysics/5.0.0")
         self.requires("sdl/2.30.4")
         self.requires("spdlog/1.14.1")
         self.requires("stb/cci.20240213")

@@ -20,8 +20,8 @@ target_link_libraries(soil
         vkrndr
     PRIVATE
         boost::boost
+        Bullet::Bullet
         EnTT::EnTT
-        joltphysics::joltphysics
         glm::glm
         SDL2::SDL2main
         spdlog::spdlog

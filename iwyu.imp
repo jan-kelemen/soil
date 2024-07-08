@@ -71,9 +71,12 @@
   { include: [ "<glm/detail/func_geometric.inl>", private, "<glm/geometric.hpp>", public ] },
   { include: [ "<glm/detail/func_trigonometric.inl>", private, "<glm/trigonometric.hpp>", public ] },
 
-  # freetype aliases
-  { include: ["@<freetype/.*>", private, "<ft2build.h>", public] },
+  # bullet3 aliases
+  { symbol: ["btScalar", private, "<LinearMath/btScalar.h>", public] },
 
   # EnTT aliases
   { include: ["@<entt/.*>", private, "<entt/entt.hpp>", public] },
+
+  # freetype aliases
+  { include: ["@<freetype/.*>", private, "<ft2build.h>", public] },
 ]

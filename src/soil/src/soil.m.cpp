@@ -58,6 +58,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
         512};
 
     soil::physics_engine physics_engine;
+    physics_engine.set_gravity({0.0f, -9.81f, 0.0f});
 
     auto context{vkrndr::create_context(&window, enable_validation_layers)};
     auto device{vkrndr::create_device(context)};

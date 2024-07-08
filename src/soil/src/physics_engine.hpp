@@ -1,6 +1,8 @@
 #ifndef SOIL_PHYSICS_ENGINE_INCLUDED
 #define SOIL_PHYSICS_ENGINE_INCLUDED
 
+#include <glm/vec3.hpp>
+
 #include <memory>
 
 namespace soil
@@ -19,6 +21,8 @@ namespace soil
 
     public:
         void fixed_update(float delta_time);
+
+        void set_gravity(glm::vec3 const& gravity);
 
     public:
         physics_engine& operator=(physics_engine const&) = delete;
