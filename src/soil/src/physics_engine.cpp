@@ -18,6 +18,7 @@
 
 #include <glm/vec3.hpp>
 
+#include <memory>
 #include <utility>
 
 class [[nodiscard]] soil::physics_engine::impl final
@@ -35,7 +36,15 @@ public:
 public:
     void fixed_update(float delta_time);
 
-    void draw();
+    void update();
+
+    [[nodiscard]] vkrndr::vulkan_scene* render_scene();
+
+    void attach_renderer(vkrndr::vulkan_device* device,
+        vkrndr::vulkan_renderer* renderer);
+
+    void detach_renderer(vkrndr::vulkan_device* device,
+        vkrndr::vulkan_renderer* renderer);
 
 public:
     void set_gravity(glm::vec3 const& gravity);
@@ -58,7 +67,7 @@ private:
 
     btAlignedObjectArray<btCollisionShape*> collision_shapes_;
 
-    bullet_debug_renderer debug_renderer_;
+    std::unique_ptr<bullet_debug_renderer> debug_renderer_;
 };
 
 soil::physics_engine::impl::impl()
@@ -68,7 +77,6 @@ soil::physics_engine::impl::impl()
           &solver_,
           &collision_configuration_}
 {
-    world_.setDebugDrawer(&debug_renderer_);
 }
 
 soil::physics_engine::impl::~impl()
@@ -108,7 +116,28 @@ void soil::physics_engine::impl::set_gravity(glm::vec3 const& gravity)
     world_.setGravity(to_bullet(gravity));
 }
 
-void soil::physics_engine::impl::draw() { world_.debugDrawWorld(); }
+void soil::physics_engine::impl::update() { world_.debugDrawWorld(); }
+
+vkrndr::vulkan_scene* soil::physics_engine::impl::render_scene()
+{
+    return debug_renderer_.get();
+}
+
+void soil::physics_engine::impl::attach_renderer(
+    vkrndr::vulkan_device* const device,
+    vkrndr::vulkan_renderer* const renderer)
+{
+    debug_renderer_ = std::make_unique<bullet_debug_renderer>(device, renderer);
+    world_.setDebugDrawer(debug_renderer_.get());
+}
+
+void soil::physics_engine::impl::detach_renderer(
+    [[maybe_unused]] vkrndr::vulkan_device* const device,
+    [[maybe_unused]] vkrndr::vulkan_renderer* const renderer)
+{
+    world_.setDebugDrawer(nullptr);
+    debug_renderer_ = nullptr;
+}
 
 btRigidBody* soil::physics_engine::impl::add_rigid_body(
     std::unique_ptr<btCollisionShape> shape,
@@ -147,7 +176,24 @@ void soil::physics_engine::fixed_update(float const delta_time)
     impl_->fixed_update(delta_time);
 }
 
-void soil::physics_engine::draw() { impl_->draw(); }
+void soil::physics_engine::update() { impl_->update(); }
+
+vkrndr::vulkan_scene* soil::physics_engine::render_scene()
+{
+    return impl_->render_scene();
+}
+
+void soil::physics_engine::attach_renderer(vkrndr::vulkan_device* const device,
+    vkrndr::vulkan_renderer* const renderer)
+{
+    impl_->attach_renderer(device, renderer);
+}
+
+void soil::physics_engine::detach_renderer(vkrndr::vulkan_device* const device,
+    vkrndr::vulkan_renderer* const renderer)
+{
+    impl_->detach_renderer(device, renderer);
+}
 
 void soil::physics_engine::set_gravity(glm::vec3 const& gravity)
 {

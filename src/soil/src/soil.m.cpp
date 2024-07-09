@@ -79,6 +79,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
         vkrndr::vulkan_renderer renderer{&window, &context, &device};
         renderer.set_imgui_layer(enable_validation_layers);
 
+        physics_engine.attach_renderer(&device, &renderer);
+
         uint64_t last_tick{SDL_GetPerformanceCounter()};
         uint64_t last_fixed_tick{last_tick};
 
@@ -117,11 +119,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
                 last_fixed_tick = current_tick;
                 physics_engine.fixed_update(fixed_delta);
             }
-            physics_engine.draw();
+            physics_engine.update();
+            renderer.draw(physics_engine.render_scene());
             renderer.end_frame();
         }
 
         vkDeviceWaitIdle(device.logical);
+
+        physics_engine.detach_renderer(&device, &renderer);
     }
 
     destroy(&device);

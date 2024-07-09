@@ -32,6 +32,14 @@ namespace vkrndr
         uint32_t first_set,
         std::span<VkDescriptorSet const> descriptor_sets);
 
+    inline void bind_pipeline(VkCommandBuffer command_buffer,
+        vulkan_pipeline const& pipeline,
+        VkPipelineBindPoint const bind_point)
+    {
+        std::span<VkDescriptorSet const> const descriptor_sets;
+        bind_pipeline(command_buffer, pipeline, bind_point, 0, descriptor_sets);
+    }
+
     void destroy(vulkan_device* device, vulkan_pipeline* pipeline);
 
     class [[nodiscard]] vulkan_pipeline_layout_builder final

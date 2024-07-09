@@ -9,6 +9,13 @@ class btCollisionShape;
 class btTransform;
 class btRigidBody;
 
+namespace vkrndr
+{
+    class vulkan_scene;
+    struct vulkan_device;
+    class vulkan_renderer;
+} // namespace vkrndr
+
 namespace soil
 {
     class [[nodiscard]] physics_engine final
@@ -26,7 +33,15 @@ namespace soil
     public:
         void fixed_update(float delta_time);
 
-        void draw();
+        void update();
+
+        [[nodiscard]] vkrndr::vulkan_scene* render_scene();
+
+        void attach_renderer(vkrndr::vulkan_device* device,
+            vkrndr::vulkan_renderer* renderer);
+
+        void detach_renderer(vkrndr::vulkan_device* device,
+            vkrndr::vulkan_renderer* renderer);
 
     public:
         void set_gravity(glm::vec3 const& gravity);

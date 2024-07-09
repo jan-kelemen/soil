@@ -68,14 +68,17 @@ void vkrndr::bind_pipeline(VkCommandBuffer command_buffer,
     uint32_t const first_set,
     std::span<VkDescriptorSet const> descriptor_sets)
 {
-    vkCmdBindDescriptorSets(command_buffer,
-        bind_point,
-        *pipeline.pipeline_layout,
-        first_set,
-        count_cast(descriptor_sets.size()),
-        descriptor_sets.data(),
-        0,
-        nullptr);
+    if (!descriptor_sets.empty())
+    {
+        vkCmdBindDescriptorSets(command_buffer,
+            bind_point,
+            *pipeline.pipeline_layout,
+            first_set,
+            count_cast(descriptor_sets.size()),
+            descriptor_sets.data(),
+            0,
+            nullptr);
+    }
 
     vkCmdBindPipeline(command_buffer, bind_point, pipeline.pipeline);
 }

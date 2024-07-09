@@ -13,6 +13,11 @@ namespace soil
     {
         return {vec.x, vec.y, vec.z};
     }
+
+    [[nodiscard]] inline glm::vec3 from_bullet(btVector3 const& vec)
+    {
+        return {vec.x(), vec.y(), vec.z()};
+    }
 } // namespace soil
 
 template<>

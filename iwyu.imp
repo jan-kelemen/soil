@@ -70,6 +70,7 @@
   { include: [ "<glm/detail/type_quat.hpp>", private, "<glm/gtc/quaternion.hpp>", public ] },
   { include: [ "<glm/detail/func_geometric.inl>", private, "<glm/geometric.hpp>", public ] },
   { include: [ "<glm/detail/func_trigonometric.inl>", private, "<glm/trigonometric.hpp>", public ] },
+  { symbol: [ "glm::vec3", private, "<glm/vec3.hpp>", public ] },
 
   # bullet3 aliases
   { symbol: ["btScalar", private, "<LinearMath/btScalar.h>", public] },
