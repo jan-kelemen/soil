@@ -182,7 +182,7 @@ vkrndr::vulkan_pipeline vkrndr::vulkan_pipeline_builder::build()
     VkPipelineInputAssemblyStateCreateInfo input_assembly{};
     input_assembly.sType =
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    input_assembly.topology = primitive_topology_;
     input_assembly.primitiveRestartEnable = VK_FALSE;
 
     VkPipelineViewportStateCreateInfo viewport_state{};
@@ -329,6 +329,15 @@ vkrndr::vulkan_pipeline_builder& vkrndr::vulkan_pipeline_builder::with_culling(
 {
     cull_mode_ = cull_mode;
     front_face_ = front_face;
+
+    return *this;
+}
+
+vkrndr::vulkan_pipeline_builder&
+vkrndr::vulkan_pipeline_builder::with_primitive_topology(
+    VkPrimitiveTopology const primitive_topology)
+{
+    primitive_topology_ = primitive_topology;
 
     return *this;
 }

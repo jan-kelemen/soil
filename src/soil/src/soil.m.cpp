@@ -9,6 +9,8 @@
 
 #include <imgui_impl_sdl2.h>
 
+#include <BulletCollision/CollisionShapes/btBoxShape.h>
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_timer.h>
@@ -60,6 +62,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
     soil::physics_engine physics_engine;
     physics_engine.set_gravity({0.0f, -9.81f, 0.0f});
 
+    // Add static cube
+    {
+        btTransform transform;
+
+        transform.setIdentity();
+        physics_engine.add_rigid_body(
+            std::make_unique<btBoxShape>(btVector3{0.5f, 0.5f, 0.5f}),
+            0.0f,
+            transform);
+    }
+
     auto context{vkrndr::create_context(&window, enable_validation_layers)};
     auto device{vkrndr::create_device(context)};
     {
@@ -104,6 +117,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
                 last_fixed_tick = current_tick;
                 physics_engine.fixed_update(fixed_delta);
             }
+            physics_engine.draw();
             renderer.end_frame();
         }
 

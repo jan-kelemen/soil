@@ -103,6 +103,9 @@ namespace vkrndr
         vulkan_pipeline_builder& with_culling(VkCullModeFlags cull_mode,
             VkFrontFace front_face);
 
+        vulkan_pipeline_builder& with_primitive_topology(
+            VkPrimitiveTopology primitive_topology);
+
         vulkan_pipeline_builder& with_color_blending(
             VkPipelineColorBlendAttachmentState color_blending);
 
@@ -125,6 +128,8 @@ namespace vkrndr
     private: // Data
         vulkan_device* device_{};
         std::shared_ptr<VkPipelineLayout> pipeline_layout_;
+        VkPrimitiveTopology primitive_topology_{
+            VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
         VkFormat image_format_{};
         std::vector<
             std::tuple<VkShaderStageFlagBits, VkShaderModule, std::string>>

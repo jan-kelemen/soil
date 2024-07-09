@@ -2,8 +2,7 @@
 Checks: '
   bugprone-*,
   -bugprone-easily-swappable-parameters,
-  clang-analyzer-*,
-  -clang-analyzer-optin.core.EnumCastOutOfRange,
+  -clang-analyzer-*,
   cppcoreguidelines-*,
   -cppcoreguidelines-avoid-do-while,
   -cppcoreguidelines-avoid-magic-numbers,
