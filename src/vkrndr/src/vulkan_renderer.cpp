@@ -17,7 +17,7 @@
 #include <vulkan_utility.hpp>
 #include <vulkan_window.hpp>
 
-#include <cppext_cyclic_stack.hpp>
+#include <cppext_cycled_buffer.hpp>
 #include <cppext_numeric.hpp>
 
 #include <stb_image.h>
@@ -184,7 +184,7 @@ void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
         return;
     }
 
-    std::vector<VkCommandBuffer> submit_buffers{command_buffers_.top()};
+    std::vector<VkCommandBuffer> submit_buffers{*command_buffers_};
 
     // NOLINTNEXTLINE(readability-qualified-auto)
     auto primary_buffer{submit_buffers[0]};
@@ -247,8 +247,8 @@ void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
 
     vkCmdBeginRendering(primary_buffer, &render_info);
 
-    record_command_buffer(inheritance_info, scene, secondary_buffers_.top());
-    vkCmdExecuteCommands(primary_buffer, 1, &secondary_buffers_.top());
+    record_command_buffer(inheritance_info, scene, *secondary_buffers_);
+    vkCmdExecuteCommands(primary_buffer, 1, &secondary_buffers_.current());
 
     vkCmdEndRendering(primary_buffer);
 

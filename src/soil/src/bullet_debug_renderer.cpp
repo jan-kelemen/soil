@@ -2,7 +2,7 @@
 
 #include <bullet_adapter.hpp> // IWYU pragma: keep
 
-#include <cppext_cyclic_stack.hpp>
+#include <cppext_cycled_buffer.hpp>
 #include <cppext_numeric.hpp>
 #include <cppext_pragma_warning.hpp>
 
@@ -95,8 +95,9 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
             .with_depth_test(depth_buffer_.format)
             .build());
 
-    frame_data_ = cppext::cyclic_stack<frame_resources>{renderer->image_count(),
-        renderer->image_count()};
+    frame_data_ =
+        cppext::cycled_buffer<frame_resources>{renderer->image_count(),
+            renderer->image_count()};
     for (auto const& [index, data] :
         std::views::enumerate(frame_data_.as_span()))
     {
@@ -128,17 +129,16 @@ void soil::bullet_debug_renderer::drawLine(btVector3 const& from,
     btVector3 const& to,
     btVector3 const& color)
 {
-    auto& frame_data{frame_data_.top()};
-    if (frame_data.vertex_count < max_vertex_count)
+    if (frame_data_->vertex_count < max_vertex_count)
     {
-        auto* const vertices{frame_data.vertex_map.as<vertex>()};
+        auto* const vertices{frame_data_->vertex_map.as<vertex>()};
 
-        vertices[frame_data.vertex_count] =
+        vertices[frame_data_->vertex_count] =
             vertex{.position = from_bullet(from), .color = from_bullet(color)};
-        vertices[frame_data.vertex_count + 1] =
+        vertices[frame_data_->vertex_count + 1] =
             vertex{.position = from_bullet(to), .color = from_bullet(color)};
 
-        frame_data.vertex_count += 2;
+        frame_data_->vertex_count += 2;
     }
 }
 
@@ -196,13 +196,11 @@ void soil::bullet_debug_renderer::resize(VkExtent2D const extent)
 void soil::bullet_debug_renderer::draw(VkCommandBuffer command_buffer,
     VkExtent2D const extent)
 {
-    auto& frame_data{frame_data_.top()};
-
     VkDeviceSize const zero_offset{0};
     vkCmdBindVertexBuffers(command_buffer,
         0,
         1,
-        &frame_data.vertex_buffer.buffer,
+        &frame_data_->vertex_buffer.buffer,
         &zero_offset);
 
     VkViewport const viewport{.x = 0.0f,
@@ -220,10 +218,9 @@ void soil::bullet_debug_renderer::draw(VkCommandBuffer command_buffer,
         *line_pipeline_,
         VK_PIPELINE_BIND_POINT_GRAPHICS);
 
-    vkCmdDraw(command_buffer, frame_data.vertex_count, 1, 0, 0);
+    vkCmdDraw(command_buffer, frame_data_->vertex_count, 1, 0, 0);
 
-    frame_data_.cycle();
-    frame_data_.top().vertex_count = 0;
+    frame_data_.cycle([](auto const&, auto& next) { next.vertex_count = 0; });
 }
 
 void soil::bullet_debug_renderer::draw_imgui() { }

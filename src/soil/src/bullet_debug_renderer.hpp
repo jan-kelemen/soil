@@ -1,7 +1,7 @@
 #ifndef BULLET_DEBUG_RENDERER_INCLUDED
 #define BULLET_DEBUG_RENDERER_INCLUDED
 
-#include <cppext_cyclic_stack.hpp>
+#include <cppext_cycled_buffer.hpp>
 
 #include <vulkan_buffer.hpp>
 #include <vulkan_image.hpp>
@@ -96,7 +96,7 @@ namespace soil
         vkrndr::vulkan_device* device_;
         vkrndr::vulkan_renderer* renderer_;
 
-        cppext::cyclic_stack<frame_resources> frame_data_;
+        cppext::cycled_buffer<frame_resources> frame_data_;
         vkrndr::vulkan_image depth_buffer_;
         std::unique_ptr<vkrndr::vulkan_pipeline> line_pipeline_;
     };

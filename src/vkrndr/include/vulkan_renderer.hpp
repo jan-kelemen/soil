@@ -1,7 +1,7 @@
 #ifndef VKRNDR_VULKAN_RENDERER_INCLUDED
 #define VKRNDR_VULKAN_RENDERER_INCLUDED
 
-#include <cppext_cyclic_stack.hpp>
+#include <cppext_cycled_buffer.hpp>
 
 #include <vulkan/vulkan_core.h>
 
@@ -110,8 +110,8 @@ namespace vkrndr
 
         std::unique_ptr<vulkan_swap_chain> swap_chain_;
 
-        cppext::cyclic_stack<VkCommandBuffer> command_buffers_;
-        cppext::cyclic_stack<VkCommandBuffer> secondary_buffers_;
+        cppext::cycled_buffer<VkCommandBuffer> command_buffers_;
+        cppext::cycled_buffer<VkCommandBuffer> secondary_buffers_;
 
         VkDescriptorPool descriptor_pool_{};
 

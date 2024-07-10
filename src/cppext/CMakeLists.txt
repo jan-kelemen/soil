@@ -5,7 +5,7 @@ target_sources(cppext
         ${CMAKE_CURRENT_SOURCE_DIR}/include/cppext_attribute.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/cppext_numeric.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/cppext_pragma_warning.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/cppext_cyclic_stack.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/cppext_cycled_buffer.hpp
 )
 
 target_include_directories(cppext
@@ -23,7 +23,7 @@ if (SOIL_BUILD_TESTS)
 
     target_sources(cppext_test
         PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/test/cppext_cyclic_stack.t.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/test/cppext_cycled_buffer.t.cpp
     )
 
     target_link_libraries(cppext_test

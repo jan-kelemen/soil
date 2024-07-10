@@ -8,7 +8,7 @@
 #include <vulkan_utility.hpp>
 #include <vulkan_window.hpp>
 
-#include <cppext_cyclic_stack.hpp>
+#include <cppext_cycled_buffer.hpp>
 
 #include <imgui.h>
 #include <imgui_impl_sdl2.h>
@@ -134,7 +134,7 @@ VkCommandBuffer vkrndr::imgui_render_layer::draw(VkImage target_image,
     VkImageView target_image_view,
     VkExtent2D extent)
 {
-    auto& command_buffer{command_buffers_.top()};
+    auto& command_buffer{*command_buffers_};
 
     check_result(vkResetCommandBuffer(command_buffer, 0));
 

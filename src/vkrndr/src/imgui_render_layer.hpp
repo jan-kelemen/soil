@@ -1,7 +1,7 @@
 #ifndef VKRNDR_IMGUI_RENDER_LAYER_INCLUDED
 #define VKRNDR_IMGUI_RENDER_LAYER_INCLUDED
 
-#include <cppext_cyclic_stack.hpp>
+#include <cppext_cycled_buffer.hpp>
 
 #include <vulkan/vulkan_core.h>
 
@@ -52,7 +52,7 @@ namespace vkrndr
         vulkan_device* device_;
 
         VkDescriptorPool descriptor_pool_;
-        cppext::cyclic_stack<VkCommandBuffer> command_buffers_;
+        cppext::cycled_buffer<VkCommandBuffer> command_buffers_;
 
         bool frame_rendered_{true};
     };
