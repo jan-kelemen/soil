@@ -4,6 +4,7 @@
 
 #include <cppext_cyclic_stack.hpp>
 #include <cppext_numeric.hpp>
+#include <cppext_pragma_warning.hpp>
 
 #include <vulkan_buffer.hpp>
 #include <vulkan_depth_buffer.hpp>
@@ -32,10 +33,16 @@ namespace
 {
     constexpr uint32_t max_vertex_count{1000};
 
+    DISABLE_WARNING_PUSH
+    DISABLE_WARNING_STRUCTURE_WAS_PADDED_DUE_TO_ALIGNMENT_SPECIFIER
+
     struct [[nodiscard]] vertex final
     {
-        glm::vec3 position;
+        alignas(16) glm::vec3 position;
+        alignas(16) glm::vec3 color;
     };
+
+    DISABLE_WARNING_POP
 
     consteval auto binding_description()
     {
@@ -54,6 +61,10 @@ namespace
                 .binding = 0,
                 .format = VK_FORMAT_R32G32B32_SFLOAT,
                 .offset = offsetof(vertex, position)},
+            VkVertexInputAttributeDescription{.location = 1,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .offset = offsetof(vertex, color)},
         };
 
         return descriptions;
@@ -117,15 +128,15 @@ void soil::bullet_debug_renderer::drawLine(btVector3 const& from,
     btVector3 const& to,
     btVector3 const& color)
 {
-    spdlog::info("Line from {} to {} with color {}", from, to, color);
-
     auto& frame_data{frame_data_.top()};
     if (frame_data.vertex_count < max_vertex_count)
     {
-        frame_data.vertex_map.as<vertex>()[frame_data.vertex_count].position =
-            from_bullet(from);
-        frame_data.vertex_map.as<vertex>()[frame_data.vertex_count + 1]
-            .position = from_bullet(to);
+        auto* const vertices{frame_data.vertex_map.as<vertex>()};
+
+        vertices[frame_data.vertex_count] =
+            vertex{.position = from_bullet(from), .color = from_bullet(color)};
+        vertices[frame_data.vertex_count + 1] =
+            vertex{.position = from_bullet(to), .color = from_bullet(color)};
 
         frame_data.vertex_count += 2;
     }
