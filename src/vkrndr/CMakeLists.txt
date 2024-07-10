@@ -4,8 +4,6 @@ target_sources(vkrndr
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include/font_manager.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gltf_manager.hpp
-        
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/sdl_window.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_buffer.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_commands.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_context.hpp
@@ -29,7 +27,6 @@ target_sources(vkrndr
         ${CMAKE_CURRENT_SOURCE_DIR}/src/global_data.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_render_layer.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_render_layer.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/sdl_window.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_buffer.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_commands.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_context.cpp
@@ -63,18 +60,16 @@ target_link_libraries(vkrndr
     PUBLIC
 		Freetype::Freetype
         imgui::imgui
+        glm::glm
         vulkan-headers::vulkan-headers
         vulkan-memory-allocator::vulkan-memory-allocator
-        SDL2::SDL2
         TinyGLTF::TinyGLTF
     PRIVATE
         stb_impl
-        imgui_impl
+        imgui_vulkan_impl
         tinygltf_impl
     PRIVATE
         fmt::fmt
-        glm::glm
-        Vulkan::Loader
         spdlog::spdlog
     PRIVATE
         project-options

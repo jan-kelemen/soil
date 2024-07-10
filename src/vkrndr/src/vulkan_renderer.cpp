@@ -129,14 +129,20 @@ VkExtent2D vkrndr::vulkan_renderer::extent() const
     return swap_chain_->extent();
 }
 
-void vkrndr::vulkan_renderer::set_imgui_layer(bool state)
+bool vkrndr::vulkan_renderer::imgui_layer() const
 {
-    if (imgui_layer_)
+    return imgui_layer_ != nullptr;
+}
+
+void vkrndr::vulkan_renderer::imgui_layer(bool const state)
+{
+    if (!state && imgui_layer_)
     {
         imgui_layer_.reset();
+        return;
     }
 
-    if (state)
+    if (state && !imgui_layer_)
     {
         imgui_layer_ = std::make_unique<imgui_render_layer>(window_,
             context_,

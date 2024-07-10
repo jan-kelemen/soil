@@ -53,7 +53,9 @@ namespace vkrndr
 
         [[nodiscard]] VkExtent2D extent() const;
 
-        void set_imgui_layer(bool state);
+        [[nodiscard]] bool imgui_layer() const;
+
+        void imgui_layer(bool state);
 
         void begin_frame();
 

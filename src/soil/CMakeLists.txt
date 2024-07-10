@@ -2,10 +2,12 @@ add_executable(soil)
 
 target_sources(soil
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/application.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/bullet_adapter.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/bullet_debug_renderer.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/physics_engine.hpp
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/application.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/bullet_adapter.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/bullet_debug_renderer.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/physics_engine.cpp
@@ -20,7 +22,7 @@ target_include_directories(soil
 target_link_libraries(soil
     PRIVATE
         cppext
-        imgui_impl
+        niku
         vkrndr
     PRIVATE
         boost::boost
@@ -29,6 +31,7 @@ target_link_libraries(soil
         glm::glm
         SDL2::SDL2main
         spdlog::spdlog
+        Vulkan::Loader
     PRIVATE
         project-options
 )

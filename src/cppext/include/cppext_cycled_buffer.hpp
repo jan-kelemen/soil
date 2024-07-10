@@ -1,7 +1,6 @@
 #ifndef CPPEXT_CYCLED_BUFFER_INCLUDED
 #define CPPEXT_CYCLED_BUFFER_INCLUDED
 
-#include <concepts>
 #include <cppext_numeric.hpp>
 
 #include <algorithm>

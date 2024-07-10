@@ -10,9 +10,9 @@
 
 #include <cppext_cycled_buffer.hpp>
 
-#include <imgui.h>
-#include <imgui_impl_sdl2.h>
 #include <imgui_impl_vulkan.h>
+
+#include <imgui.h>
 
 #include <spdlog/spdlog.h>
 
@@ -126,7 +126,7 @@ void vkrndr::imgui_render_layer::begin_frame()
     assert(std::exchange(frame_rendered_, false));
 
     ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
+    window_->new_imgui_frame();
     ImGui::NewFrame();
 }
 

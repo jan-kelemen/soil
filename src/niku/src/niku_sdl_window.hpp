@@ -1,16 +1,17 @@
-#ifndef VKRNDR_SDL_WINDOW_INCLUDED
-#define VKRNDR_SDL_WINDOW_INCLUDED
+#ifndef NIKU_SDL_WINDOW_INCLUDED
+#define NIKU_SDL_WINDOW_INCLUDED
 
 #include <vulkan_window.hpp>
 
 #include <SDL2/SDL_video.h>
+
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
 #include <string_view>
 #include <vector>
 
-namespace vkrndr
+namespace niku
 {
     class [[nodiscard]] sdl_guard final
     {
@@ -30,7 +31,7 @@ namespace vkrndr
         sdl_guard& operator=(sdl_guard&&) = delete;
     };
 
-    class [[nodiscard]] sdl_window final : public vulkan_window
+    class [[nodiscard]] sdl_window final : public vkrndr::vulkan_window
     {
     public: // Construction
         sdl_window(std::string_view title,
@@ -63,6 +64,8 @@ namespace vkrndr
 
         void init_imgui() override;
 
+        void new_imgui_frame() override;
+
         void shutdown_imgui() override;
 
     public: // Operators
@@ -73,10 +76,10 @@ namespace vkrndr
     private: // Data
         SDL_Window* window_;
     };
-} // namespace vkrndr
+} // namespace niku
 
 [[nodiscard]]
-constexpr SDL_Window* vkrndr::sdl_window::native_handle() const noexcept
+constexpr SDL_Window* niku::sdl_window::native_handle() const noexcept
 {
     return window_;
 }
