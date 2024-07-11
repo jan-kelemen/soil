@@ -1,7 +1,7 @@
 add_library(imgui_vulkan_impl)
 
 target_sources(imgui_vulkan_impl
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/imgui_impl_vulkan.h
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_impl_vulkan.cpp
@@ -21,7 +21,7 @@ target_link_libraries(imgui_vulkan_impl
 add_library(imgui_sdl_impl)
 
 target_sources(imgui_sdl_impl
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/imgui_impl_sdl2.h
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_impl_sdl2.cpp

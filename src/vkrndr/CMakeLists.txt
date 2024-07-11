@@ -1,9 +1,10 @@
 add_library(vkrndr)
 
 target_sources(vkrndr
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/font_manager.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gltf_manager.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/vkrndr_camera.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_buffer.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_commands.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_context.hpp
@@ -39,7 +40,6 @@ target_sources(vkrndr
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_pipeline.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_queue.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_renderer.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_scene.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_synchronization.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_swap_chain.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_swap_chain.hpp

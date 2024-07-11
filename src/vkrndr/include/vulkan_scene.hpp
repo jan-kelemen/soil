@@ -1,6 +1,8 @@
 #ifndef VKRNDR_VULKAN_SCENE_INCLUDED
 #define VKRNDR_VULKAN_SCENE_INCLUDED
 
+#include <vkrndr_camera.hpp>
+
 #include <vulkan/vulkan_core.h>
 
 namespace vkrndr
@@ -24,6 +26,8 @@ namespace vkrndr
         [[nodiscard]] virtual vulkan_image* depth_image() = 0;
 
         virtual void resize(VkExtent2D extent) = 0;
+
+        virtual void update(camera const& camera, float delta_time) = 0;
 
         virtual void draw(VkCommandBuffer command_buffer,
             VkExtent2D extent) = 0;

@@ -1,7 +1,7 @@
 add_library(tinygltf_impl)
 
 target_sources(tinygltf_impl
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/tinygltf_impl.hpp
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/tinygltf_impl.cpp

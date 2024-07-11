@@ -71,6 +71,8 @@ namespace soil
 
         void resize(VkExtent2D extent) override;
 
+        void update(vkrndr::camera const& camera, float delta_time) override;
+
         void draw(VkCommandBuffer command_buffer, VkExtent2D extent) override;
 
         void draw_imgui() override;
@@ -86,6 +88,10 @@ namespace soil
             vkrndr::vulkan_buffer vertex_buffer;
             vkrndr::mapped_memory vertex_map{};
             uint32_t vertex_count{};
+
+            vkrndr::vulkan_buffer vertex_uniform;
+            vkrndr::mapped_memory uniform_map{};
+            VkDescriptorSet descriptor_set{VK_NULL_HANDLE};
         };
 
     private: // Physics data
@@ -96,9 +102,11 @@ namespace soil
         vkrndr::vulkan_device* device_;
         vkrndr::vulkan_renderer* renderer_;
 
-        cppext::cycled_buffer<frame_resources> frame_data_;
-        vkrndr::vulkan_image depth_buffer_;
+        VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> line_pipeline_;
+        vkrndr::vulkan_image depth_buffer_;
+
+        cppext::cycled_buffer<frame_resources> frame_data_;
     };
 } // namespace soil
 

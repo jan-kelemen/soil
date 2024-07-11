@@ -1,6 +1,7 @@
 #ifndef SOIL_APPLICATION_INCLUDED
 #define SOIL_APPLICATION_INCLUDED
 
+#include <perspective_camera.hpp>
 #include <physics_engine.hpp>
 
 #include <niku_application.hpp>
@@ -32,6 +33,8 @@ namespace soil
         application& operator=(application&&) noexcept = delete;
 
     private: // niku::application callback interface
+        bool handle_event([[maybe_unused]] SDL_Event const& event) override;
+
         void fixed_update(float delta_time) override;
 
         void update(float delta_time) override;
@@ -44,6 +47,7 @@ namespace soil
 
     private:
         physics_engine physics_;
+        perspective_camera camera_;
     };
 } // namespace soil
 

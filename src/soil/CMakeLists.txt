@@ -5,11 +5,13 @@ target_sources(soil
         ${CMAKE_CURRENT_SOURCE_DIR}/src/application.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/bullet_adapter.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/bullet_debug_renderer.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/perspective_camera.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/physics_engine.hpp
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/application.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/bullet_adapter.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/bullet_debug_renderer.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/perspective_camera.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/physics_engine.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/soil.m.cpp
 )

@@ -8,11 +8,13 @@
 
 #include <vulkan_buffer.hpp>
 #include <vulkan_depth_buffer.hpp>
+#include <vulkan_descriptors.hpp>
 #include <vulkan_device.hpp>
 #include <vulkan_image.hpp>
 #include <vulkan_memory.hpp>
 #include <vulkan_pipeline.hpp>
 #include <vulkan_renderer.hpp>
+#include <vulkan_utility.hpp>
 
 #include <LinearMath/btVector3.h>
 
@@ -44,6 +46,12 @@ namespace
 
     DISABLE_WARNING_POP
 
+    struct [[nodiscard]] transform final
+    {
+        glm::fmat4 view;
+        glm::fmat4 projection;
+    };
+
     consteval auto binding_description()
     {
         constexpr std::array descriptions{
@@ -69,6 +77,54 @@ namespace
 
         return descriptions;
     }
+
+    [[nodiscard]] VkDescriptorSetLayout create_descriptor_set_layout(
+        vkrndr::vulkan_device const* const device)
+    {
+        VkDescriptorSetLayoutBinding vertex_uniform_binding{};
+        vertex_uniform_binding.binding = 0;
+        vertex_uniform_binding.descriptorType =
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        vertex_uniform_binding.descriptorCount = 1;
+        vertex_uniform_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        std::array const bindings{vertex_uniform_binding};
+
+        VkDescriptorSetLayoutCreateInfo layout_info{};
+        layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layout_info.bindingCount = vkrndr::count_cast(bindings.size());
+        layout_info.pBindings = bindings.data();
+
+        VkDescriptorSetLayout rv; // NOLINT
+        vkrndr::check_result(vkCreateDescriptorSetLayout(device->logical,
+            &layout_info,
+            nullptr,
+            &rv));
+
+        return rv;
+    }
+
+    void bind_descriptor_set(vkrndr::vulkan_device const* const device,
+        VkDescriptorSet const& descriptor_set,
+        VkDescriptorBufferInfo const vertex_uniform_info)
+    {
+        VkWriteDescriptorSet vertex_uniform_write{};
+        vertex_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        vertex_uniform_write.dstSet = descriptor_set;
+        vertex_uniform_write.dstBinding = 0;
+        vertex_uniform_write.dstArrayElement = 0;
+        vertex_uniform_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        vertex_uniform_write.descriptorCount = 1;
+        vertex_uniform_write.pBufferInfo = &vertex_uniform_info;
+
+        std::array const descriptor_writes{vertex_uniform_write};
+
+        vkUpdateDescriptorSets(device->logical,
+            vkrndr::count_cast(descriptor_writes.size()),
+            descriptor_writes.data(),
+            0,
+            nullptr);
+    }
 } // namespace
 
 soil::bullet_debug_renderer::bullet_debug_renderer(
@@ -76,12 +132,15 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
     vkrndr::vulkan_renderer* const renderer)
     : device_{device}
     , renderer_{renderer}
+    , descriptor_set_layout_{create_descriptor_set_layout(device_)}
     , depth_buffer_{
           vkrndr::create_depth_buffer(device, renderer->extent(), false)}
 {
     line_pipeline_ = std::make_unique<vkrndr::vulkan_pipeline>(
         vkrndr::vulkan_pipeline_builder{device_,
-            vkrndr::vulkan_pipeline_layout_builder{device_}.build(),
+            vkrndr::vulkan_pipeline_layout_builder{device_}
+                .add_descriptor_set_layout(descriptor_set_layout_)
+                .build(),
             renderer->image_format()}
             .add_shader(VK_SHADER_STAGE_VERTEX_BIT,
                 "bullet_debug_line.vert.spv",
@@ -101,13 +160,34 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
     for (auto const& [index, data] :
         std::views::enumerate(frame_data_.as_span()))
     {
+        auto const vertex_buffer_size{max_vertex_count * sizeof(vertex)};
         data.vertex_buffer = vkrndr::create_buffer(device_,
-            max_vertex_count * sizeof(vertex) * renderer->image_count(),
+            vertex_buffer_size,
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         data.vertex_map =
             vkrndr::map_memory(device, data.vertex_buffer.allocation);
+
+        auto const uniform_buffer_size{sizeof(transform)};
+        data.vertex_uniform = create_buffer(device_,
+            uniform_buffer_size,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        data.uniform_map =
+            vkrndr::map_memory(device, data.vertex_uniform.allocation);
+
+        create_descriptor_sets(device_,
+            descriptor_set_layout_,
+            renderer->descriptor_pool(),
+            std::span{&data.descriptor_set, 1});
+
+        bind_descriptor_set(device_,
+            data.descriptor_set,
+            VkDescriptorBufferInfo{.buffer = data.vertex_uniform.buffer,
+                .offset = 0,
+                .range = uniform_buffer_size});
     }
 }
 
@@ -115,12 +195,24 @@ soil::bullet_debug_renderer::~bullet_debug_renderer()
 {
     for (auto& data : frame_data_.as_span())
     {
+        vkFreeDescriptorSets(device_->logical,
+            renderer_->descriptor_pool(),
+            1,
+            &data.descriptor_set);
+
+        unmap_memory(device_, &data.uniform_map);
+        destroy(device_, &data.vertex_uniform);
+
         unmap_memory(device_, &data.vertex_map);
         destroy(device_, &data.vertex_buffer);
     }
 
     destroy(device_, line_pipeline_.get());
     line_pipeline_ = nullptr;
+
+    vkDestroyDescriptorSetLayout(device_->logical,
+        descriptor_set_layout_,
+        nullptr);
 
     destroy(device_, &depth_buffer_);
 }
@@ -193,6 +285,14 @@ void soil::bullet_debug_renderer::resize(VkExtent2D const extent)
     depth_buffer_ = vkrndr::create_depth_buffer(device_, extent, false);
 }
 
+void soil::bullet_debug_renderer::update(
+    [[maybe_unused]] vkrndr::camera const& camera,
+    [[maybe_unused]] float const delta_time)
+{
+    *frame_data_->uniform_map.as<transform>() = {.view = camera.view_matrix(),
+        .projection = camera.projection_matrix()};
+}
+
 void soil::bullet_debug_renderer::draw(VkCommandBuffer command_buffer,
     VkExtent2D const extent)
 {
@@ -216,7 +316,9 @@ void soil::bullet_debug_renderer::draw(VkCommandBuffer command_buffer,
 
     vkrndr::bind_pipeline(command_buffer,
         *line_pipeline_,
-        VK_PIPELINE_BIND_POINT_GRAPHICS);
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        0,
+        std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
 
     vkCmdDraw(command_buffer, frame_data_->vertex_count, 1, 0, 0);
 

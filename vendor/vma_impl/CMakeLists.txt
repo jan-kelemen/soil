@@ -1,7 +1,7 @@
 add_library(vma_impl)
 
 target_sources(vma_impl
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vma_impl.hpp
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vma_impl.cpp

@@ -126,14 +126,16 @@ void niku::application::run()
             {
                 done = true;
             }
+            else
+            {
+                handle_event(event);
+            }
         }
 
         if (done)
         {
             break;
         }
-
-        handle_event(event);
 
         auto const frequency{cppext::as_fp(SDL_GetPerformanceFrequency())};
 
