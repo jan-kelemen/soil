@@ -1,6 +1,9 @@
 #include <application.hpp>
 
+#include <perspective_camera.hpp>
 #include <physics_engine.hpp>
+
+#include <cppext_numeric.hpp>
 
 #include <niku_application.hpp>
 
@@ -12,8 +15,13 @@
 #include <LinearMath/btTransform.h>
 #include <LinearMath/btVector3.h>
 
+#include <SDL_events.h>
 #include <SDL_video.h>
+
+#include <cstdint>
 #include <memory>
+
+// IWYU pragma: no_include <glm/detail/qualifier.hpp>
 
 soil::application::application(bool debug)
     : niku::application(niku::startup_params{
@@ -28,7 +36,7 @@ soil::application::application(bool debug)
     fixed_update_interval(1.0f / 60.0f);
 
     camera_.resize({512, 512});
-    camera_.set_position({0.0f, -10.f, 0.0f});
+    camera_.set_position({-5.0f, -5.0f, -5.0f});
 }
 
 bool soil::application::handle_event(SDL_Event const& event)

@@ -4,13 +4,14 @@
 #include <niku_perspective_camera.hpp>
 
 #include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 
 namespace soil
 {
     class [[nodiscard]] perspective_camera : public niku::perspective_camera
     {
     public:
-        perspective_camera() = default;
+        perspective_camera();
 
         perspective_camera(perspective_camera const&) = default;
 
@@ -25,8 +26,10 @@ namespace soil
         void set_position(glm::vec3 const& position);
 
     public:
+        // cppcheck-suppress duplInheritedMember
         perspective_camera& operator=(perspective_camera const&) = default;
 
+        // cppcheck-suppress duplInheritedMember
         perspective_camera& operator=(perspective_camera&&) noexcept = default;
 
     private:

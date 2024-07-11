@@ -122,13 +122,16 @@ void niku::application::run()
                 ImGui_ImplSDL2_ProcessEvent(&event);
             }
 
-            if (impl_->is_current_window_event(event) && is_quit_event(event))
+            if (impl_->is_current_window_event(event))
             {
-                done = true;
-            }
-            else
-            {
-                handle_event(event);
+                if (is_quit_event(event))
+                {
+                    done = true;
+                }
+                else
+                {
+                    handle_event(event);
+                }
             }
         }
 

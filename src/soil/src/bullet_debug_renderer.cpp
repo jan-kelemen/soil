@@ -6,6 +6,7 @@
 #include <cppext_numeric.hpp>
 #include <cppext_pragma_warning.hpp>
 
+#include <vkrndr_camera.hpp>
 #include <vulkan_buffer.hpp>
 #include <vulkan_depth_buffer.hpp>
 #include <vulkan_descriptors.hpp>
@@ -20,6 +21,7 @@
 
 #include <fmt/base.h>
 
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
 #include <spdlog/spdlog.h>
@@ -48,8 +50,8 @@ namespace
 
     struct [[nodiscard]] transform final
     {
-        glm::fmat4 view;
-        glm::fmat4 projection;
+        glm::mat4 view;
+        glm::mat4 projection;
     };
 
     consteval auto binding_description()

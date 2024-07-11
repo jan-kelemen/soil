@@ -6,6 +6,8 @@
 
 #include <niku_application.hpp>
 
+#include <SDL2/SDL_events.h>
+
 namespace vkrndr
 {
     class vulkan_renderer;

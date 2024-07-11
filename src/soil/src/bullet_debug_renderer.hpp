@@ -23,6 +23,7 @@ namespace vkrndr
     struct vulkan_device;
     struct vulkan_pipeline;
     class vulkan_renderer;
+    class camera;
 } // namespace vkrndr
 
 namespace soil

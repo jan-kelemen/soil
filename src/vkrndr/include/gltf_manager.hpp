@@ -29,7 +29,7 @@ namespace vkrndr
     };
 
     gltf_bounding_box get_aabb(gltf_bounding_box const& box,
-        glm::fmat4 const& local_matrix);
+        glm::mat4 const& local_matrix);
 
     struct [[nodiscard]] gltf_vertex final
     {
