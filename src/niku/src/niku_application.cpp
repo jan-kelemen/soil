@@ -151,7 +151,7 @@ void niku::application::run()
 
         // NOLINTBEGIN(bugprone-unchecked-optional-access)
         bool const do_fixed_update{impl_->fixed_update_interval.has_value() &&
-            *impl_->fixed_update_interval >= fixed_delta};
+            fixed_delta >= *impl_->fixed_update_interval};
         // NOLINTEND(bugprone-unchecked-optional-access)
 
         last_tick = current_tick;

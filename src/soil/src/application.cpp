@@ -12,6 +12,7 @@
 
 #include <BulletCollision/CollisionShapes/btBoxShape.h>
 #include <BulletCollision/CollisionShapes/btCollisionShape.h>
+#include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
 #include <LinearMath/btTransform.h>
 #include <LinearMath/btVector3.h>
 
@@ -36,7 +37,7 @@ soil::application::application(bool debug)
     fixed_update_interval(1.0f / 60.0f);
 
     camera_.resize({512, 512});
-    camera_.set_position({-5.0f, -5.0f, -5.0f});
+    camera_.set_position({-15.0f, 15.0f, -15.0f});
 }
 
 bool soil::application::handle_event(SDL_Event const& event)
@@ -81,11 +82,39 @@ void soil::application::on_startup()
     {
         btTransform transform;
         transform.setIdentity();
+        transform.setOrigin({0.0f, 10.0f, 0.0f});
 
         physics_.add_rigid_body(
             std::make_unique<btBoxShape>(btVector3{0.5f, 0.5f, 0.5f}),
-            0.0f,
+            0.1f,
             transform);
+    }
+
+    // Add heightfield
+    {
+        heightfield_data_.resize(25);
+
+        for (size_t i{}; i != heightfield_data_.size(); ++i)
+        {
+            heightfield_data_[i] = cppext::as_fp(i % 3);
+        }
+
+        btTransform transform;
+        transform.setIdentity();
+        transform.setOrigin({0.0f, 0.0f, 0.0f});
+
+        auto heightfield_shape{std::make_unique<btHeightfieldTerrainShape>(5,
+            5,
+            heightfield_data_.data(),
+            10.0f,
+            0.0f,
+            5.0f,
+            1,
+            PHY_FLOAT,
+            false)};
+        heightfield_shape->setLocalScaling({2.0f, 1.0f, 2.0f});
+
+        physics_.add_rigid_body(std::move(heightfield_shape), 0.0f, transform);
     }
 
     physics_.attach_renderer(this->vulkan_device(), this->vulkan_renderer());

@@ -8,6 +8,8 @@
 
 #include <SDL2/SDL_events.h>
 
+#include <vector>
+
 namespace vkrndr
 {
     class vulkan_renderer;
@@ -50,6 +52,8 @@ namespace soil
     private:
         physics_engine physics_;
         perspective_camera camera_;
+
+        std::vector<float> heightfield_data_;
     };
 } // namespace soil
 
