@@ -33,25 +33,18 @@ soil::application::application(bool debug)
           .centered = true,
           .width = 512,
           .height = 512})
+    , camera_controller_{&camera_}
 {
     fixed_update_interval(1.0f / 60.0f);
 
     camera_.resize({512, 512});
     camera_.set_position({-15.0f, 15.0f, -15.0f});
+    camera_.update();
 }
 
 bool soil::application::handle_event(SDL_Event const& event)
 {
-    if (event.type == SDL_WINDOWEVENT)
-    {
-        auto const& window{event.window};
-        if (window.event == SDL_WINDOWEVENT_RESIZED ||
-            window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
-        {
-            camera_.resize({cppext::narrow<uint32_t>(window.data1),
-                cppext::narrow<uint32_t>(window.data2)});
-        }
-    }
+    camera_controller_.handle_event(event);
 
     return true;
 }
@@ -61,9 +54,9 @@ void soil::application::fixed_update(float const delta_time)
     physics_.fixed_update(delta_time);
 }
 
-void soil::application::update([[maybe_unused]] float const delta_time)
+void soil::application::update(float const delta_time)
 {
-    camera_.update();
+    camera_controller_.update(delta_time);
 
     physics_.update();
     physics_.render_scene()->update(camera_, delta_time);

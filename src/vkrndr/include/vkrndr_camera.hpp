@@ -13,7 +13,11 @@ namespace vkrndr
         virtual ~camera() = default;
 
     public:
+        virtual void set_aspect_ratio(float aspect_ratio) = 0;
+
         [[nodiscard]] virtual float aspect_ratio() const = 0;
+
+        virtual void set_position(glm::vec3 const& position) = 0;
 
         [[nodiscard]] virtual glm::vec3 const& position() const = 0;
 

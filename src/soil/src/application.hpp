@@ -1,6 +1,7 @@
 #ifndef SOIL_APPLICATION_INCLUDED
 #define SOIL_APPLICATION_INCLUDED
 
+#include <free_camera_controller.hpp>
 #include <perspective_camera.hpp>
 #include <physics_engine.hpp>
 
@@ -52,6 +53,7 @@ namespace soil
     private:
         physics_engine physics_;
         perspective_camera camera_;
+        free_camera_controller camera_controller_;
 
         std::vector<float> heightfield_data_;
     };

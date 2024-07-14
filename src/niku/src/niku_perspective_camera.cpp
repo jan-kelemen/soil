@@ -10,23 +10,48 @@
 
 niku::perspective_camera::perspective_camera()
     : perspective_camera({0.0f, 0.0f, 0.0f},
+          16.0f / 9.0f,
           45.0f,
           {0.0f, 1.0f, 0.0f},
           {0.1f, 100.0f},
-          {45.0f, -45.0f},
-          16.0f / 9.0f)
+          {45.0f, -45.0f})
 {
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 niku::perspective_camera::perspective_camera(glm::vec3 const& position,
+    float const aspect_ratio,
     float const fov,
     glm::vec3 const& world_up,
     glm::vec2 const& near_far_planes,
-    glm::vec2 const& yaw_pitch,
-    float const aspect_ratio)
+    glm::vec2 const& yaw_pitch)
+    : camera(position, aspect_ratio)
+    , fov_{fov}
+    , world_up_{world_up}
+    , near_far_planes_{near_far_planes}
+    , yaw_pitch_{yaw_pitch}
 {
-    update(position, fov, world_up, near_far_planes, yaw_pitch, aspect_ratio);
+    calculate_view_projection_matrices();
+}
+
+void niku::perspective_camera::set_yaw_pitch(glm::vec2 const& yaw_pitch)
+{
+    yaw_pitch_ = yaw_pitch;
+}
+
+glm::vec3 const& niku::perspective_camera::up_direction() const
+{
+    return up_direction_;
+}
+
+glm::vec3 const& niku::perspective_camera::front_direction() const
+{
+    return front_direction_;
+}
+
+glm::vec3 const& niku::perspective_camera::right_direction() const
+{
+    return right_direction_;
 }
 
 void niku::perspective_camera::update()
@@ -43,30 +68,6 @@ void niku::perspective_camera::update()
         glm::normalize(glm::cross(right_direction_, front_direction_));
 
     calculate_view_projection_matrices();
-}
-
-void niku::perspective_camera::update(glm::vec3 const& position,
-    float const fov,
-    glm::vec3 const& world_up,
-    glm::vec2 const& near_far_planes,
-    glm::vec2 const& yaw_pitch,
-    float const aspect_ratio)
-{
-    position_ = position;
-    fov_ = fov;
-    world_up_ = world_up;
-    near_far_planes_ = near_far_planes;
-    aspect_ratio_ = aspect_ratio;
-    yaw_pitch_ = yaw_pitch;
-
-    update();
-}
-
-float niku::perspective_camera::aspect_ratio() const { return aspect_ratio_; }
-
-glm::vec3 const& niku::perspective_camera::position() const
-{
-    return position_;
 }
 
 glm::mat4 const& niku::perspective_camera::view_matrix() const
