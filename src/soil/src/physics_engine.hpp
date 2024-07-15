@@ -4,6 +4,7 @@
 #include <glm/vec3.hpp>
 
 #include <memory>
+#include <utility>
 
 class btCollisionShape;
 class btTransform;
@@ -49,6 +50,9 @@ namespace soil
         btRigidBody* add_rigid_body(std::unique_ptr<btCollisionShape> shape,
             float mass,
             btTransform const& transform);
+
+        [[nodiscard]] std::pair<btRigidBody const*, glm::vec3>
+        raycast(glm::vec3 const& from, glm::vec3 const& to) const;
 
     public:
         physics_engine& operator=(physics_engine const&) = delete;

@@ -1,5 +1,7 @@
 #include <niku_perspective_camera.hpp>
 
+#include <niku_camera.hpp>
+
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/mat4x4.hpp>
@@ -26,12 +28,17 @@ niku::perspective_camera::perspective_camera(glm::vec3 const& position,
     glm::vec2 const& near_far_planes,
     glm::vec2 const& yaw_pitch)
     : camera(position, aspect_ratio)
-    , fov_{fov}
     , world_up_{world_up}
     , near_far_planes_{near_far_planes}
     , yaw_pitch_{yaw_pitch}
+    , fov_{fov}
 {
     calculate_view_projection_matrices();
+}
+
+glm::vec2 const& niku::perspective_camera::yaw_pitch() const
+{
+    return yaw_pitch_;
 }
 
 void niku::perspective_camera::set_yaw_pitch(glm::vec2 const& yaw_pitch)

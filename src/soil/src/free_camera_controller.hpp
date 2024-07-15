@@ -1,20 +1,26 @@
 #ifndef SOIL_FREE_CAMERA_CONTROLLER
 #define SOIL_FREE_CAMERA_CONTROLLER
 
-#include <perspective_camera.hpp>
-
 #include <glm/vec3.hpp>
 
 #include <SDL2/SDL_events.h>
+
+namespace niku
+{
+    class mouse;
+} // namespace niku
+
+namespace soil
+{
+    class perspective_camera;
+} // namespace soil
 
 namespace soil
 {
     class [[nodiscard]] free_camera_controller final
     {
     public:
-        free_camera_controller() = default;
-
-        explicit free_camera_controller(perspective_camera* camera);
+        free_camera_controller(perspective_camera* camera, niku::mouse* mouse);
 
         free_camera_controller(free_camera_controller const&) = default;
 
@@ -36,10 +42,11 @@ namespace soil
             free_camera_controller&&) noexcept = default;
 
     private:
-        perspective_camera* camera_{nullptr};
+        perspective_camera* camera_;
+        niku::mouse* mouse_;
         bool update_needed_{false};
 
-        glm::vec3 velocity_;
+        glm::vec3 velocity_{0.0f, 0.0f, 0.0f};
     };
 } // namespace soil
 

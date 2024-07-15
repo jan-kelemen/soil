@@ -1,5 +1,7 @@
 #include <application.hpp>
 
+#include <free_camera_controller.hpp>
+#include <mouse_controller.hpp>
 #include <perspective_camera.hpp>
 #include <physics_engine.hpp>
 
@@ -13,15 +15,18 @@
 #include <BulletCollision/CollisionShapes/btBoxShape.h>
 #include <BulletCollision/CollisionShapes/btCollisionShape.h>
 #include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
+#include <BulletDynamics/Dynamics/btRigidBody.h>
 #include <LinearMath/btTransform.h>
 #include <LinearMath/btVector3.h>
 
 #include <SDL_events.h>
 #include <SDL_video.h>
 
-#include <cstdint>
+#include <cstddef>
 #include <memory>
+#include <utility>
 
+// IWYU pragma: no_include <BulletCollision/CollisionShapes/btConcaveShape.h>
 // IWYU pragma: no_include <glm/detail/qualifier.hpp>
 
 soil::application::application(bool debug)
@@ -33,7 +38,9 @@ soil::application::application(bool debug)
           .centered = true,
           .width = 512,
           .height = 512})
-    , camera_controller_{&camera_}
+    , mouse_{!debug}
+    , camera_controller_{&camera_, &mouse_}
+    , mouse_controller_{&mouse_, &camera_, &physics_}
 {
     fixed_update_interval(1.0f / 60.0f);
 
@@ -45,6 +52,7 @@ soil::application::application(bool debug)
 bool soil::application::handle_event(SDL_Event const& event)
 {
     camera_controller_.handle_event(event);
+    mouse_controller_.handle_event(event);
 
     return true;
 }
@@ -77,10 +85,11 @@ void soil::application::on_startup()
         transform.setIdentity();
         transform.setOrigin({0.0f, 10.0f, 0.0f});
 
-        physics_.add_rigid_body(
+        auto* const cube{physics_.add_rigid_body(
             std::make_unique<btBoxShape>(btVector3{0.5f, 0.5f, 0.5f}),
             0.1f,
-            transform);
+            transform)};
+        cube->setUserIndex(1);
     }
 
     // Add heightfield
@@ -105,9 +114,12 @@ void soil::application::on_startup()
             1,
             PHY_FLOAT,
             false)};
-        heightfield_shape->setLocalScaling({2.0f, 1.0f, 2.0f});
 
-        physics_.add_rigid_body(std::move(heightfield_shape), 0.0f, transform);
+        auto* const heightfield{
+            physics_.add_rigid_body(std::move(heightfield_shape),
+                0.0f,
+                transform)};
+        heightfield->setUserIndex(2);
     }
 
     physics_.attach_renderer(this->vulkan_device(), this->vulkan_renderer());

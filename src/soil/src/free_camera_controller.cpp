@@ -4,10 +4,15 @@
 
 #include <cppext_numeric.hpp>
 
+#include <niku_mouse.hpp>
+
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_scancode.h>
+#include <SDL2/SDL_video.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 namespace
@@ -15,9 +20,11 @@ namespace
     constexpr auto velocity_factor{3.0f};
 } // namespace
 
-soil::free_camera_controller::free_camera_controller(perspective_camera* camera)
+soil::free_camera_controller::free_camera_controller(
+    perspective_camera* const camera,
+    niku::mouse* const mouse)
     : camera_{camera}
-    , velocity_{0.0f, 0.0f, 0.0f}
+    , mouse_{mouse}
 {
 }
 
@@ -34,7 +41,7 @@ void soil::free_camera_controller::handle_event(SDL_Event const& event)
             update_needed_ = true;
         }
     }
-    if (event.type == SDL_KEYUP || event.type == SDL_KEYDOWN)
+    else if (event.type == SDL_KEYUP || event.type == SDL_KEYDOWN)
     {
         int keyboard_state_length; // NOLINT
         uint8_t const* const keyboard_state{
@@ -64,6 +71,23 @@ void soil::free_camera_controller::handle_event(SDL_Event const& event)
 
         update_needed_ = true;
     }
+    else if (event.type == SDL_MOUSEMOTION && mouse_->captured())
+    {
+        constexpr auto mouse_sensitivity_{0.1f};
+
+        auto const& yaw_pitch{camera_->yaw_pitch()};
+        auto const& mouse_offset{mouse_->relative_offset()};
+
+        auto const yaw{
+            yaw_pitch.x + cppext::as_fp(mouse_offset.x) * mouse_sensitivity_};
+        auto const pitch{
+            yaw_pitch.y + cppext::as_fp(-mouse_offset.y) * mouse_sensitivity_};
+
+        camera_->set_yaw_pitch(
+            {fmodf(yaw, 180), std::clamp(pitch, -90.0f, 90.0f)});
+
+        update_needed_ = true;
+    }
 }
 
 void soil::free_camera_controller::update(float delta_time)
@@ -73,5 +97,7 @@ void soil::free_camera_controller::update(float delta_time)
         camera_->set_position(camera_->position() + velocity_ * delta_time);
 
         camera_->update();
+
+        update_needed_ = false;
     }
 }

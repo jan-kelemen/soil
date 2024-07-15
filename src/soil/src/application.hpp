@@ -2,10 +2,12 @@
 #define SOIL_APPLICATION_INCLUDED
 
 #include <free_camera_controller.hpp>
+#include <mouse_controller.hpp>
 #include <perspective_camera.hpp>
 #include <physics_engine.hpp>
 
 #include <niku_application.hpp>
+#include <niku_mouse.hpp>
 
 #include <SDL2/SDL_events.h>
 
@@ -53,7 +55,10 @@ namespace soil
     private:
         physics_engine physics_;
         perspective_camera camera_;
+        niku::mouse mouse_;
+
         free_camera_controller camera_controller_;
+        mouse_controller mouse_controller_;
 
         std::vector<float> heightfield_data_;
     };

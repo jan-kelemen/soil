@@ -6,6 +6,7 @@
 #include <BulletCollision/BroadphaseCollision/btDbvtBroadphase.h>
 #include <BulletCollision/CollisionDispatch/btCollisionDispatcher.h>
 #include <BulletCollision/CollisionDispatch/btCollisionObject.h>
+#include <BulletCollision/CollisionDispatch/btCollisionWorld.h>
 #include <BulletCollision/CollisionDispatch/btDefaultCollisionConfiguration.h>
 #include <BulletCollision/CollisionShapes/btCollisionShape.h>
 #include <BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolver.h>
@@ -52,6 +53,9 @@ public:
     btRigidBody* add_rigid_body(std::unique_ptr<btCollisionShape> shape,
         float mass,
         btTransform const& transform);
+
+    [[nodiscard]] std::pair<btRigidBody const*, btVector3>
+    raycast(btVector3 const& from, btVector3 const& to) const;
 
 public:
     impl& operator=(impl const&) = delete;
@@ -167,6 +171,21 @@ btRigidBody* soil::physics_engine::impl::add_rigid_body(
     return body;
 }
 
+std::pair<btRigidBody const*, btVector3> soil::physics_engine::impl::raycast(
+    btVector3 const& from,
+    btVector3 const& to) const
+{
+    btCollisionWorld::ClosestRayResultCallback callback{from, to};
+    world_.rayTest(from, to, callback);
+    if (callback.hasHit())
+    {
+        return std::make_pair(btRigidBody::upcast(callback.m_collisionObject),
+            callback.m_hitPointWorld);
+    }
+
+    return {nullptr, {}};
+}
+
 soil::physics_engine::physics_engine() : impl_{std::make_unique<impl>()} { }
 
 soil::physics_engine::~physics_engine() = default;
@@ -206,4 +225,11 @@ btRigidBody* soil::physics_engine::add_rigid_body(
     btTransform const& transform)
 {
     return impl_->add_rigid_body(std::move(shape), mass, transform);
+}
+
+std::pair<btRigidBody const*, glm::vec3>
+soil::physics_engine::raycast(glm::vec3 const& from, glm::vec3 const& to) const
+{
+    auto rv{impl_->raycast(to_bullet(from), to_bullet(to))};
+    return {rv.first, from_bullet(rv.second)};
 }

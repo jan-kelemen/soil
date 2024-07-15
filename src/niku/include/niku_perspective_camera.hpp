@@ -29,13 +29,15 @@ namespace niku
         ~perspective_camera() override = default;
 
     public:
+        [[nodiscard]] glm::vec2 const& yaw_pitch() const;
+
         void set_yaw_pitch(glm::vec2 const& yaw_pitch);
 
-        glm::vec3 const& up_direction() const;
+        [[nodiscard]] glm::vec3 const& up_direction() const;
 
-        glm::vec3 const& front_direction() const;
+        [[nodiscard]] glm::vec3 const& front_direction() const;
 
-        glm::vec3 const& right_direction() const;
+        [[nodiscard]] glm::vec3 const& right_direction() const;
 
     public: // niku::camera overrides
         void update() override;

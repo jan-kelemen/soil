@@ -3,6 +3,8 @@
 
 #include <vkrndr_camera.hpp>
 
+#include <glm/vec3.hpp>
+
 namespace niku
 {
     class [[nodiscard]] camera : public vkrndr::camera

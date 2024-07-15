@@ -6,6 +6,8 @@
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
+#include <utility>
+
 namespace soil
 {
     class [[nodiscard]] perspective_camera : public niku::perspective_camera
@@ -21,9 +23,12 @@ namespace soil
         ~perspective_camera() override = default;
 
     public:
+        [[nodiscard]] glm::uvec2 const& extent() const;
+
         void resize(glm::uvec2 const& extent);
 
-        void set_position(glm::vec3 const& position);
+        [[nodiscard]] std::pair<glm::vec3, glm::vec3> raycast(
+            glm::vec2 const& position) const;
 
     public:
         // cppcheck-suppress duplInheritedMember
