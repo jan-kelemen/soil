@@ -19,6 +19,8 @@
 #include <LinearMath/btTransform.h>
 #include <LinearMath/btVector3.h>
 
+#include <PerlinNoise.hpp>
+
 #include <SDL_events.h>
 #include <SDL_video.h>
 
@@ -94,26 +96,44 @@ void soil::application::on_startup()
 
     // Add heightfield
     {
-        heightfield_data_.resize(25);
+        constexpr size_t dimension{25};
+        constexpr float height_scale{5.0f};
+        constexpr siv::PerlinNoise::seed_type seed{123456u};
 
-        for (size_t i{}; i != heightfield_data_.size(); ++i)
+        siv::BasicPerlinNoise<float> const perlin{seed};
+
+        heightfield_data_.reserve(dimension * dimension);
+        for (size_t y{}; y != dimension; ++y)
         {
-            heightfield_data_[i] = cppext::as_fp(i % 3);
+            for (size_t x{}; x != dimension; ++x)
+            {
+                if (y != 12 || x != 12)
+                {
+                    heightfield_data_.push_back(
+                        perlin.noise2D_01(cppext::as_fp(x), cppext::as_fp(y)));
+                }
+                else
+                {
+                    heightfield_data_.push_back(0.0f);
+                }
+            }
         }
 
         btTransform transform;
         transform.setIdentity();
         transform.setOrigin({0.0f, 0.0f, 0.0f});
 
-        auto heightfield_shape{std::make_unique<btHeightfieldTerrainShape>(5,
-            5,
-            heightfield_data_.data(),
-            10.0f,
-            0.0f,
-            5.0f,
-            1,
-            PHY_FLOAT,
-            false)};
+        auto heightfield_shape{
+            std::make_unique<btHeightfieldTerrainShape>(dimension,
+                dimension,
+                heightfield_data_.data(),
+                1.0f,
+                0.0f,
+                1.0f,
+                1,
+                PHY_FLOAT,
+                false)};
+        heightfield_shape->setLocalScaling({10.0f, height_scale, 10.0f});
 
         auto* const heightfield{
             physics_.add_rigid_body(std::move(heightfield_shape),

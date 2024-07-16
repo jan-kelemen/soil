@@ -37,6 +37,7 @@ target_link_libraries(soil
         glm::glm
         SDL2::SDL2main
         spdlog::spdlog
+        siv::PerlinNoise
         Vulkan::Loader
     PRIVATE
         project-options

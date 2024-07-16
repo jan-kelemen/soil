@@ -17,7 +17,7 @@
 
 namespace
 {
-    constexpr auto velocity_factor{3.0f};
+    constexpr auto velocity_factor{10.0f};
 } // namespace
 
 soil::free_camera_controller::free_camera_controller(
@@ -49,22 +49,26 @@ void soil::free_camera_controller::handle_event(SDL_Event const& event)
 
         velocity_ = {0.0f, 0.0f, 0.0f};
 
-        if (keyboard_state[SDL_SCANCODE_LEFT] != 0)
+        if (keyboard_state[SDL_SCANCODE_LEFT] != 0 ||
+            keyboard_state[SDL_SCANCODE_A] != 0)
         {
             velocity_ -= velocity_factor * camera_->right_direction();
         }
 
-        if (keyboard_state[SDL_SCANCODE_RIGHT] != 0)
+        if (keyboard_state[SDL_SCANCODE_RIGHT] != 0 ||
+            keyboard_state[SDL_SCANCODE_D] != 0)
         {
             velocity_ += velocity_factor * camera_->right_direction();
         }
 
-        if (keyboard_state[SDL_SCANCODE_UP] != 0)
+        if (keyboard_state[SDL_SCANCODE_UP] != 0 ||
+            keyboard_state[SDL_SCANCODE_W] != 0)
         {
             velocity_ += velocity_factor * camera_->front_direction();
         }
 
-        if (keyboard_state[SDL_SCANCODE_DOWN] != 0)
+        if (keyboard_state[SDL_SCANCODE_DOWN] != 0 ||
+            keyboard_state[SDL_SCANCODE_S] != 0)
         {
             velocity_ -= velocity_factor * camera_->front_direction();
         }
@@ -84,7 +88,7 @@ void soil::free_camera_controller::handle_event(SDL_Event const& event)
             yaw_pitch.y + cppext::as_fp(-mouse_offset.y) * mouse_sensitivity_};
 
         camera_->set_yaw_pitch(
-            {fmodf(yaw, 180), std::clamp(pitch, -90.0f, 90.0f)});
+            {fmodf(yaw, 360), std::clamp(pitch, -85.0f, 85.0f)});
 
         update_needed_ = true;
     }

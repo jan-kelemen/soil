@@ -67,7 +67,8 @@ std::pair<glm::vec3, glm::vec3> soil::mouse_controller::raycast_to_world() const
         if (mouse_->captured())
         {
             auto const extent{camera_->extent()};
-            return glm::vec2{cppext::as_fp(extent.x), cppext::as_fp(extent.y)};
+            return glm::vec2{cppext::as_fp(extent.x) / 2.0f,
+                cppext::as_fp(extent.y) / 2.0f};
         }
 
         auto const absolute{mouse_->position()};

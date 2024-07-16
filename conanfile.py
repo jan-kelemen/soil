@@ -18,6 +18,7 @@ class SoilConan(ConanFile):
         self.requires("freetype/2.13.2")
         self.requires("glm/cci.20230113")
         self.requires("imgui/1.90.8-docking")
+        self.requires("perlinnoise/3.0.0")
         self.requires("sdl/2.30.4")
         self.requires("spdlog/1.14.1")
         self.requires("stb/cci.20240213")
