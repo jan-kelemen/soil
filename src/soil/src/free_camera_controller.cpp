@@ -17,7 +17,7 @@
 
 namespace
 {
-    constexpr auto velocity_factor{10.0f};
+    constexpr auto velocity_factor{5.00f};
 } // namespace
 
 soil::free_camera_controller::free_camera_controller(
@@ -96,7 +96,7 @@ void soil::free_camera_controller::handle_event(SDL_Event const& event)
 
 void soil::free_camera_controller::update(float delta_time)
 {
-    if (update_needed_)
+    if (update_needed_ || velocity_ != glm::vec3{0.0f, 0.0f, 0.0f})
     {
         camera_->set_position(camera_->position() + velocity_ * delta_time);
 
