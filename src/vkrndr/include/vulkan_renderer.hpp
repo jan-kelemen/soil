@@ -87,10 +87,9 @@ namespace vkrndr
     private: // Helpers
         void recreate();
 
-        void record_command_buffer(
-            VkCommandBufferInheritanceInfo inheritance_info,
+        void record_command_buffer(VkImageView target_image,
             vulkan_scene* scene,
-            VkCommandBuffer& command_buffer) const;
+            VkCommandBuffer command_buffer) const;
 
         [[nodiscard]] bool is_multisampled() const;
 

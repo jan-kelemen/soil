@@ -201,62 +201,13 @@ void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     check_result(vkBeginCommandBuffer(primary_buffer, &begin_info));
 
-    VkFormat const format{image_format()};
-    VkCommandBufferInheritanceRenderingInfo rendering_inheritance_info{};
-    rendering_inheritance_info.sType =
-        VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO;
-    rendering_inheritance_info.colorAttachmentCount = 1;
-    rendering_inheritance_info.pColorAttachmentFormats = &format;
-    rendering_inheritance_info.rasterizationSamples = device_->max_msaa_samples;
-
-    VkCommandBufferInheritanceInfo inheritance_info{};
-    inheritance_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-    inheritance_info.pNext = &rendering_inheritance_info;
-
-    VkRenderingAttachmentInfo const color_attachment_info{
-        setup_color_attachment(scene->clear_color(),
-            swap_chain_->image_view(image_index),
-            color_image_.view)};
-
-    std::optional<VkRenderingAttachmentInfo> depth_attachment_info;
-    if (auto* const depth_image{scene->depth_image()})
-    {
-        depth_attachment_info =
-            setup_depth_attachment(scene->clear_depth(), depth_image->view);
-        rendering_inheritance_info.depthAttachmentFormat = depth_image->format;
-        if (has_stencil_component(depth_image->format))
-        {
-            rendering_inheritance_info.stencilAttachmentFormat =
-                depth_image->format;
-        }
-    }
-
-    VkRenderingInfo render_info{};
-    render_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-    render_info.renderArea = {{0, 0}, extent()};
-    render_info.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
-    render_info.layerCount = 1;
-    render_info.colorAttachmentCount = 1;
-    render_info.pColorAttachments = &color_attachment_info;
-    if (depth_attachment_info)
-    {
-        render_info.pDepthAttachment = &depth_attachment_info.value();
-        if (rendering_inheritance_info.stencilAttachmentFormat !=
-            VK_FORMAT_UNDEFINED)
-        {
-            render_info.pStencilAttachment = &depth_attachment_info.value();
-        }
-    }
-
     wait_for_color_attachment_write(swap_chain_->image(image_index),
         primary_buffer);
 
-    vkCmdBeginRendering(primary_buffer, &render_info);
-
-    record_command_buffer(inheritance_info, scene, *secondary_buffers_);
+    record_command_buffer(swap_chain_->image_view(image_index),
+        scene,
+        *secondary_buffers_);
     vkCmdExecuteCommands(primary_buffer, 1, &secondary_buffers_.current());
-
-    vkCmdEndRendering(primary_buffer);
 
     if (imgui_layer_)
     {
@@ -454,21 +405,48 @@ std::unique_ptr<vkrndr::gltf_model> vkrndr::vulkan_renderer::load_model(
     return gltf_manager_->load(model_path);
 }
 
-void vkrndr::vulkan_renderer::record_command_buffer(
-    VkCommandBufferInheritanceInfo const inheritance_info,
-    vulkan_scene* const scene,
-    VkCommandBuffer& command_buffer) const
+void vkrndr::vulkan_renderer::record_command_buffer(VkImageView target_image,
+    vulkan_scene* scene,
+    VkCommandBuffer command_buffer) const
 {
     check_result(vkResetCommandBuffer(command_buffer, 0));
 
+    VkCommandBufferInheritanceInfo inheritance_info{};
+    inheritance_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+
     VkCommandBufferBeginInfo secondary_begin_info{};
     secondary_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    secondary_begin_info.flags =
-        VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     secondary_begin_info.pInheritanceInfo = &inheritance_info;
     check_result(vkBeginCommandBuffer(command_buffer, &secondary_begin_info));
 
+    VkRenderingAttachmentInfo const color_attachment_info{
+        setup_color_attachment(scene->clear_color(),
+            target_image,
+            color_image_.view)};
+
+    VkRenderingInfo render_info{};
+    render_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    render_info.renderArea = {{0, 0}, extent()};
+    render_info.layerCount = 1;
+    render_info.colorAttachmentCount = 1;
+    render_info.pColorAttachments = &color_attachment_info;
+
+    std::optional<VkRenderingAttachmentInfo> depth_attachment_info;
+    if (auto* const depth_image{scene->depth_image()})
+    {
+        depth_attachment_info =
+            setup_depth_attachment(scene->clear_depth(), depth_image->view);
+
+        render_info.pDepthAttachment = &depth_attachment_info.value();
+        if (has_stencil_component(depth_image->format))
+        {
+            render_info.pStencilAttachment = &depth_attachment_info.value();
+        }
+    }
+
+    vkCmdBeginRendering(command_buffer, &render_info);
     scene->draw(command_buffer, extent());
+    vkCmdEndRendering(command_buffer);
 
     check_result(vkEndCommandBuffer(command_buffer));
 }
