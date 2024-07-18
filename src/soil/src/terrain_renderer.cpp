@@ -145,6 +145,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             .with_rasterization_samples(device_->max_msaa_samples)
             .add_vertex_input(binding_description(), attribute_descriptions())
             .with_depth_test(depth_buffer_.format)
+            .with_culling(VK_CULL_MODE_BACK_BIT,
+                VK_FRONT_FACE_COUNTER_CLOCKWISE)
             .build());
 
     auto const vertex_buffer_size{
@@ -184,8 +186,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             for (size_t x{}; x != heightmap.dimension() - 1; ++x)
             {
                 indices[0] = z * heightmap.dimension() + x;
-                indices[1] = z * heightmap.dimension() + x + 1;
-                indices[2] = (z + 1) * heightmap.dimension() + x;
+                indices[1] = (z + 1) * heightmap.dimension() + x;
+                indices[2] = z * heightmap.dimension() + x + 1;
                 indices[3] = z * heightmap.dimension() + x + 1;
                 indices[4] = (z + 1) * heightmap.dimension() + x;
                 indices[5] = (z + 1) * heightmap.dimension() + x + 1;
