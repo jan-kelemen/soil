@@ -39,6 +39,9 @@ namespace vkrndr
         VkDeviceSize size,
         VkBuffer target_buffer);
 
+    void wait_for_color_attachment_read(VkImage image,
+        VkCommandBuffer command_buffer);
+
     void wait_for_color_attachment_write(VkImage image,
         VkCommandBuffer command_buffer);
 

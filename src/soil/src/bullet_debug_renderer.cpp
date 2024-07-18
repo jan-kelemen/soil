@@ -19,6 +19,8 @@
 
 #include <LinearMath/btVector3.h>
 
+#include <imgui.h>
+
 #include <fmt/base.h>
 
 #include <glm/mat4x4.hpp>
@@ -327,4 +329,4 @@ void soil::bullet_debug_renderer::draw(VkCommandBuffer command_buffer,
     frame_data_.cycle([](auto const&, auto& next) { next.vertex_count = 0; });
 }
 
-void soil::bullet_debug_renderer::draw_imgui() { }
+void soil::bullet_debug_renderer::draw_imgui() { ImGui::ShowMetricsWindow(); }

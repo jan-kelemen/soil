@@ -147,7 +147,7 @@ VkCommandBuffer vkrndr::imgui_render_layer::draw(VkImage target_image,
     color_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     color_attachment_info.imageLayout =
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     color_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     color_attachment_info.imageView = target_image_view;
 
@@ -159,7 +159,7 @@ VkCommandBuffer vkrndr::imgui_render_layer::draw(VkImage target_image,
     render_info.colorAttachmentCount = 1;
     render_info.pColorAttachments = &color_attachment_info;
 
-    wait_for_color_attachment_write(target_image, command_buffer);
+    wait_for_color_attachment_read(target_image, command_buffer);
 
     vkCmdBeginRendering(command_buffer, &render_info);
 

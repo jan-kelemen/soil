@@ -142,6 +142,19 @@ void vkrndr::copy_buffer_to_buffer(VkCommandBuffer const command_buffer,
     vkCmdCopyBuffer(command_buffer, source_buffer, target_buffer, 1, &region);
 }
 
+void vkrndr::wait_for_color_attachment_read(VkImage const image,
+    VkCommandBuffer command_buffer)
+{
+    transition_image(image,
+        command_buffer,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT);
+}
+
 void vkrndr::wait_for_color_attachment_write(VkImage const image,
     VkCommandBuffer command_buffer)
 {
