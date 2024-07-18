@@ -1,27 +1,15 @@
-#include <bullet_debug_renderer.hpp>
+#include <terrain_renderer.hpp>
 
-#include <bullet_adapter.hpp> // IWYU pragma: keep
+#include <heightmap.hpp>
 
-#include <cppext_cycled_buffer.hpp>
-#include <cppext_numeric.hpp>
 #include <cppext_pragma_warning.hpp>
 
-#include <vkrndr_camera.hpp>
-#include <vulkan_buffer.hpp>
 #include <vulkan_depth_buffer.hpp>
 #include <vulkan_descriptors.hpp>
 #include <vulkan_device.hpp>
-#include <vulkan_image.hpp>
-#include <vulkan_memory.hpp>
 #include <vulkan_pipeline.hpp>
 #include <vulkan_renderer.hpp>
 #include <vulkan_utility.hpp>
-
-#include <LinearMath/btVector3.h>
-
-#include <imgui.h>
-
-#include <fmt/base.h>
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
@@ -29,11 +17,7 @@
 #include <spdlog/spdlog.h>
 
 #include <array>
-#include <cstddef>
 #include <ranges>
-
-// IWYU pragma: no_include <filesystem>
-// IWYU pragma: no_include <span>
 
 namespace
 {
@@ -52,6 +36,7 @@ namespace
 
     struct [[nodiscard]] transform final
     {
+        glm::mat4 model;
         glm::mat4 view;
         glm::mat4 projection;
     };
@@ -131,32 +116,102 @@ namespace
     }
 } // namespace
 
-soil::bullet_debug_renderer::bullet_debug_renderer(
-    vkrndr::vulkan_device* const device,
-    vkrndr::vulkan_renderer* const renderer)
+soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
+    vkrndr::vulkan_renderer* renderer,
+    heightmap const& heightmap)
     : device_{device}
     , renderer_{renderer}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
-    , depth_buffer_{
-          vkrndr::create_depth_buffer(device, renderer->extent(), false)}
+    , depth_buffer_{vkrndr::create_depth_buffer(device,
+          renderer->extent(),
+          false)}
+    , vertex_count_{cppext::narrow<uint32_t>(
+          heightmap.dimension() * heightmap.dimension())}
+    , index_offset_{vertex_count_ * sizeof(vertex)}
+    , index_count_{cppext::narrow<uint32_t>(
+          (heightmap.dimension() - 1) * (heightmap.dimension() - 1) * 6)}
 {
-    line_pipeline_ = std::make_unique<vkrndr::vulkan_pipeline>(
+    pipeline_ = std::make_unique<vkrndr::vulkan_pipeline>(
         vkrndr::vulkan_pipeline_builder{device_,
             vkrndr::vulkan_pipeline_layout_builder{device_}
                 .add_descriptor_set_layout(descriptor_set_layout_)
                 .build(),
             renderer->image_format()}
-            .add_shader(VK_SHADER_STAGE_VERTEX_BIT,
-                "bullet_debug_line.vert.spv",
-                "main")
+            .add_shader(VK_SHADER_STAGE_VERTEX_BIT, "terrain.vert.spv", "main")
             .add_shader(VK_SHADER_STAGE_FRAGMENT_BIT,
-                "bullet_debug_line.frag.spv",
+                "terrain.frag.spv",
                 "main")
-            .with_primitive_topology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST)
+            .with_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
             .with_rasterization_samples(device_->max_msaa_samples)
             .add_vertex_input(binding_description(), attribute_descriptions())
             .with_depth_test(depth_buffer_.format)
             .build());
+
+    auto const vertex_buffer_size{
+        vertex_count_ * sizeof(vertex) + index_count_ * sizeof(uint16_t)};
+    vertex_index_buffer_ = vkrndr::create_buffer(device_,
+        vertex_buffer_size,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    {
+        vkrndr::vulkan_buffer staging_buffer{vkrndr::create_buffer(device_,
+            vertex_buffer_size,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+
+        vkrndr::mapped_memory staging_map{
+            vkrndr::map_memory(device_, staging_buffer.allocation)};
+
+        auto* const vertices{staging_map.as<vertex>()};
+        auto const heightmap_data{heightmap.data()};
+        for (size_t y{}; y != heightmap.dimension(); ++y)
+        {
+            for (size_t x{}; x != heightmap.dimension(); ++x)
+            {
+                vertices[y * heightmap.dimension() + x] = {
+                    .position = {cppext::as_fp(x),
+                        heightmap.value(x, y),
+                        cppext::as_fp(y)},
+                    .color = {1.0f, 1.0f, 1.0f}};
+            }
+        }
+
+        auto* indices{staging_map.as<uint16_t>(index_offset_)};
+        for (size_t z{}; z != heightmap.dimension() - 1; ++z)
+        {
+            for (size_t x{}; x != heightmap.dimension() - 1; ++x)
+            {
+                indices[0] = z * heightmap.dimension() + x;
+                indices[1] = z * heightmap.dimension() + x + 1;
+                indices[2] = (z + 1) * heightmap.dimension() + x;
+                indices[3] = z * heightmap.dimension() + x + 1;
+                indices[4] = (z + 1) * heightmap.dimension() + x;
+                indices[5] = (z + 1) * heightmap.dimension() + x + 1;
+
+                indices += 6;
+            }
+        }
+
+        vkrndr::unmap_memory(device_, &staging_map);
+
+        renderer_->transfer_buffer(staging_buffer, vertex_index_buffer_);
+
+        destroy(device_, &staging_buffer);
+    }
+
+    float const center_offset{(heightmap.dimension() - 1) / 2.0f};
+
+    // Heightmap values range from [0, 1], bullet recenters it to [-0.5, 0.5]
+    glm::vec3 offset{center_offset, 0.5f, center_offset};
+
+    // Adjust offsets for scaling of heightmap
+    offset *= -heightmap.scaling();
+
+    glm::mat4 model_matrix{1.0f};
+    model_matrix = glm::translate(model_matrix, offset);
+    model_matrix = glm::scale(model_matrix, heightmap.scaling());
 
     frame_data_ =
         cppext::cycled_buffer<frame_resources>{renderer->image_count(),
@@ -164,15 +219,6 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
     for (auto const& [index, data] :
         std::views::enumerate(frame_data_.as_span()))
     {
-        auto const vertex_buffer_size{max_vertex_count * sizeof(vertex)};
-        data.vertex_buffer = vkrndr::create_buffer(device_,
-            vertex_buffer_size,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        data.vertex_map =
-            vkrndr::map_memory(device, data.vertex_buffer.allocation);
-
         auto const uniform_buffer_size{sizeof(transform)};
         data.vertex_uniform = create_buffer(device_,
             uniform_buffer_size,
@@ -181,6 +227,7 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         data.uniform_map =
             vkrndr::map_memory(device, data.vertex_uniform.allocation);
+        data.uniform_map.as<transform>()->model = model_matrix;
 
         create_descriptor_sets(device_,
             descriptor_set_layout_,
@@ -195,7 +242,7 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
     }
 }
 
-soil::bullet_debug_renderer::~bullet_debug_renderer()
+soil::terrain_renderer::~terrain_renderer()
 {
     for (auto& data : frame_data_.as_span())
     {
@@ -206,13 +253,12 @@ soil::bullet_debug_renderer::~bullet_debug_renderer()
 
         unmap_memory(device_, &data.uniform_map);
         destroy(device_, &data.vertex_uniform);
-
-        unmap_memory(device_, &data.vertex_map);
-        destroy(device_, &data.vertex_buffer);
     }
 
-    destroy(device_, line_pipeline_.get());
-    line_pipeline_ = nullptr;
+    destroy(device_, &vertex_index_buffer_);
+
+    destroy(device_, pipeline_.get());
+    pipeline_ = nullptr;
 
     vkDestroyDescriptorSetLayout(device_->logical,
         descriptor_set_layout_,
@@ -221,90 +267,49 @@ soil::bullet_debug_renderer::~bullet_debug_renderer()
     destroy(device_, &depth_buffer_);
 }
 
-void soil::bullet_debug_renderer::drawLine(btVector3 const& from,
-    btVector3 const& to,
-    btVector3 const& color)
-{
-    if (frame_data_->vertex_count < max_vertex_count)
-    {
-        auto* const vertices{frame_data_->vertex_map.as<vertex>()};
-
-        vertices[frame_data_->vertex_count] =
-            vertex{.position = from_bullet(from), .color = from_bullet(color)};
-        vertices[frame_data_->vertex_count + 1] =
-            vertex{.position = from_bullet(to), .color = from_bullet(color)};
-
-        frame_data_->vertex_count += 2;
-    }
-}
-
-void soil::bullet_debug_renderer::drawContactPoint(btVector3 const& PointOnB,
-    btVector3 const& normalOnB,
-    btScalar const distance,
-    [[maybe_unused]] int const lifeTime,
-    btVector3 const& color)
-{
-    drawLine(PointOnB, PointOnB + normalOnB * distance, color);
-    btVector3 const ncolor{0, 0, 0};
-    drawLine(PointOnB, PointOnB + normalOnB * 0.01f, ncolor);
-}
-
-void soil::bullet_debug_renderer::reportErrorWarning(char const* warningString)
-{
-    spdlog::error("{}", warningString);
-}
-
-void soil::bullet_debug_renderer::draw3dText(
-    [[maybe_unused]] btVector3 const& location,
-    [[maybe_unused]] char const* textString)
-{
-    spdlog::info("Text '{}' on {}", textString, location);
-}
-
-void soil::bullet_debug_renderer::setDebugMode(int debugMode)
-{
-    debug_mode_ = debugMode;
-}
-
-int soil::bullet_debug_renderer::getDebugMode() const { return debug_mode_; }
-
-VkClearValue soil::bullet_debug_renderer::clear_color()
+VkClearValue soil::terrain_renderer::clear_color()
 {
     return {{{0.0f, 0.0f, 0.0f, 1.f}}};
 }
 
-VkClearValue soil::bullet_debug_renderer::clear_depth()
+VkClearValue soil::terrain_renderer::clear_depth()
 {
     return {.depthStencil = {1.0f, 0}};
 }
 
-vkrndr::vulkan_image* soil::bullet_debug_renderer::depth_image()
+vkrndr::vulkan_image* soil::terrain_renderer::depth_image()
 {
     return &depth_buffer_;
 }
 
-void soil::bullet_debug_renderer::resize(VkExtent2D const extent)
+void soil::terrain_renderer::resize(VkExtent2D extent)
 {
     destroy(device_, &depth_buffer_);
     depth_buffer_ = vkrndr::create_depth_buffer(device_, extent, false);
 }
 
-void soil::bullet_debug_renderer::update(vkrndr::camera const& camera,
-    [[maybe_unused]] float const delta_time)
+void soil::terrain_renderer::update(vkrndr::camera const& camera,
+    [[maybe_unused]] float delta_time)
 {
-    *frame_data_->uniform_map.as<transform>() = {.view = camera.view_matrix(),
-        .projection = camera.projection_matrix()};
+    auto& uniform{*frame_data_->uniform_map.as<transform>()};
+    uniform.view = camera.view_matrix();
+    uniform.projection = camera.projection_matrix();
 }
 
-void soil::bullet_debug_renderer::draw(VkCommandBuffer command_buffer,
-    VkExtent2D const extent)
+void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
+    VkExtent2D extent)
 {
     VkDeviceSize const zero_offset{0};
     vkCmdBindVertexBuffers(command_buffer,
         0,
         1,
-        &frame_data_->vertex_buffer.buffer,
+        &vertex_index_buffer_.buffer,
         &zero_offset);
+
+    vkCmdBindIndexBuffer(command_buffer,
+        vertex_index_buffer_.buffer,
+        index_offset_,
+        VK_INDEX_TYPE_UINT16);
 
     VkViewport const viewport{.x = 0.0f,
         .y = 0.0f,
@@ -318,14 +323,14 @@ void soil::bullet_debug_renderer::draw(VkCommandBuffer command_buffer,
     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
     vkrndr::bind_pipeline(command_buffer,
-        *line_pipeline_,
+        *pipeline_,
         VK_PIPELINE_BIND_POINT_GRAPHICS,
         0,
         std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
 
-    vkCmdDraw(command_buffer, frame_data_->vertex_count, 1, 0, 0);
+    vkCmdDrawIndexed(command_buffer, index_count_, 1, 0, 0, 1);
 
-    frame_data_.cycle([](auto const&, auto& next) { next.vertex_count = 0; });
+    frame_data_.cycle();
 }
 
-void soil::bullet_debug_renderer::draw_imgui() { ImGui::ShowMetricsWindow(); }
+void soil::terrain_renderer::draw_imgui() { }

@@ -17,7 +17,7 @@
 
 namespace
 {
-    constexpr auto velocity_factor{5.00f};
+    constexpr auto velocity_factor{10.00f};
 } // namespace
 
 soil::free_camera_controller::free_camera_controller(

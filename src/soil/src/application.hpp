@@ -11,12 +11,18 @@
 
 #include <SDL2/SDL_events.h>
 
-#include <vector>
+#include <memory>
 
 namespace vkrndr
 {
     class vulkan_renderer;
 } // namespace vkrndr
+
+namespace soil
+{
+    class heightmap;
+    class terrain_renderer;
+} // namespace soil
 
 namespace soil
 {
@@ -30,7 +36,7 @@ namespace soil
         application(application&&) noexcept = delete;
 
     public:
-        ~application() override = default;
+        ~application() override;
 
     public:
         // cppcheck-suppress duplInheritedMember
@@ -60,7 +66,8 @@ namespace soil
         free_camera_controller camera_controller_;
         mouse_controller mouse_controller_;
 
-        std::vector<float> heightfield_data_;
+        std::unique_ptr<heightmap> heightmap_;
+        std::unique_ptr<terrain_renderer> terrain_renderer_;
     };
 } // namespace soil
 
