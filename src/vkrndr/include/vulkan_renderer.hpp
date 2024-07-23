@@ -84,26 +84,6 @@ namespace vkrndr
 
         vulkan_renderer& operator=(vulkan_renderer&&) noexcept = delete;
 
-    private: // Helpers
-        void recreate();
-
-        void record_command_buffer(VkImageView target_image,
-            vulkan_scene* scene,
-            VkCommandBuffer command_buffer) const;
-
-        [[nodiscard]] bool is_multisampled() const;
-
-        void cleanup_images();
-
-        [[nodiscard]] VkRenderingAttachmentInfo setup_color_attachment(
-            VkClearValue clear_value,
-            VkImageView target_image,
-            VkImageView intermediate_image) const;
-
-        [[nodiscard]] VkRenderingAttachmentInfo setup_depth_attachment(
-            VkClearValue clear_value,
-            VkImageView target_image) const;
-
     private: // Data
         vulkan_window* window_;
         vulkan_context* context_;
@@ -115,8 +95,6 @@ namespace vkrndr
         cppext::cycled_buffer<VkCommandBuffer> secondary_buffers_;
 
         VkDescriptorPool descriptor_pool_{};
-
-        vulkan_image color_image_;
 
         std::unique_ptr<imgui_render_layer> imgui_layer_;
         std::unique_ptr<font_manager> font_manager_;

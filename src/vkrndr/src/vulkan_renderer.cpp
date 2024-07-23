@@ -90,8 +90,6 @@ vkrndr::vulkan_renderer::vulkan_renderer(vulkan_window* const window,
     , font_manager_{std::make_unique<font_manager>()}
     , gltf_manager_{std::make_unique<gltf_manager>(this)}
 {
-    recreate();
-
     create_command_buffers(device_,
         device->present_queue->command_pool,
         vulkan_swap_chain::max_frames_in_flight,
@@ -110,8 +108,6 @@ vkrndr::vulkan_renderer::~vulkan_renderer()
     imgui_layer_.reset();
 
     vkDestroyDescriptorPool(device_->logical, descriptor_pool_, nullptr);
-
-    cleanup_images();
 }
 
 VkFormat vkrndr::vulkan_renderer::image_format() const
@@ -178,7 +174,6 @@ void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
 
         vkDeviceWaitIdle(device_->logical);
         swap_chain_->recreate();
-        recreate();
         scene->resize(extent());
         swap_chain_refresh.store(false);
         return;
@@ -192,8 +187,7 @@ void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
 
     std::vector<VkCommandBuffer> submit_buffers{*command_buffers_};
 
-    // NOLINTNEXTLINE(readability-qualified-auto)
-    auto primary_buffer{submit_buffers[0]};
+    VkCommandBuffer primary_buffer{submit_buffers[0]};
 
     check_result(vkResetCommandBuffer(primary_buffer, 0));
 
@@ -204,10 +198,12 @@ void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
     wait_for_color_attachment_write(swap_chain_->image(image_index),
         primary_buffer);
 
-    record_command_buffer(swap_chain_->image_view(image_index),
-        scene,
-        *secondary_buffers_);
-    vkCmdExecuteCommands(primary_buffer, 1, &secondary_buffers_.current());
+    VkCommandBuffer secondary_buffer{*secondary_buffers_};
+    check_result(vkResetCommandBuffer(secondary_buffer, 0));
+    scene->draw(swap_chain_->image_view(image_index),
+        secondary_buffer,
+        extent());
+    vkCmdExecuteCommands(primary_buffer, 1, &secondary_buffer);
 
     if (imgui_layer_)
     {
@@ -403,127 +399,4 @@ std::unique_ptr<vkrndr::gltf_model> vkrndr::vulkan_renderer::load_model(
     std::filesystem::path const& model_path)
 {
     return gltf_manager_->load(model_path);
-}
-
-void vkrndr::vulkan_renderer::record_command_buffer(VkImageView target_image,
-    vulkan_scene* scene,
-    VkCommandBuffer command_buffer) const
-{
-    check_result(vkResetCommandBuffer(command_buffer, 0));
-
-    VkCommandBufferInheritanceInfo inheritance_info{};
-    inheritance_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-
-    VkCommandBufferBeginInfo secondary_begin_info{};
-    secondary_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    secondary_begin_info.pInheritanceInfo = &inheritance_info;
-    check_result(vkBeginCommandBuffer(command_buffer, &secondary_begin_info));
-
-    VkRenderingAttachmentInfo const color_attachment_info{
-        setup_color_attachment(scene->clear_color(),
-            target_image,
-            color_image_.view)};
-
-    VkRenderingInfo render_info{};
-    render_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-    render_info.renderArea = {{0, 0}, extent()};
-    render_info.layerCount = 1;
-    render_info.colorAttachmentCount = 1;
-    render_info.pColorAttachments = &color_attachment_info;
-
-    std::optional<VkRenderingAttachmentInfo> depth_attachment_info;
-    if (auto* const depth_image{scene->depth_image()})
-    {
-        depth_attachment_info =
-            setup_depth_attachment(scene->clear_depth(), depth_image->view);
-
-        render_info.pDepthAttachment = &depth_attachment_info.value();
-        if (has_stencil_component(depth_image->format))
-        {
-            render_info.pStencilAttachment = &depth_attachment_info.value();
-        }
-    }
-
-    vkCmdBeginRendering(command_buffer, &render_info);
-    scene->draw(command_buffer, extent());
-    vkCmdEndRendering(command_buffer);
-
-    check_result(vkEndCommandBuffer(command_buffer));
-}
-
-bool vkrndr::vulkan_renderer::is_multisampled() const
-{
-    return device_->max_msaa_samples != VK_SAMPLE_COUNT_1_BIT;
-}
-
-void vkrndr::vulkan_renderer::recreate()
-{
-    if (is_multisampled())
-    {
-        cleanup_images();
-        color_image_ = create_image_and_view(device_,
-            extent(),
-            1,
-            device_->max_msaa_samples,
-            image_format(),
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            VK_IMAGE_ASPECT_COLOR_BIT);
-    }
-}
-
-void vkrndr::vulkan_renderer::cleanup_images()
-{
-    destroy(device_, &color_image_);
-}
-
-VkRenderingAttachmentInfo vkrndr::vulkan_renderer::setup_color_attachment(
-    VkClearValue const clear_value,
-    VkImageView const target_image,
-    VkImageView const intermediate_image) const
-{
-    VkRenderingAttachmentInfo color_attachment_info{};
-
-    color_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    color_attachment_info.imageLayout =
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    color_attachment_info.clearValue = clear_value;
-    if (is_multisampled())
-    {
-        color_attachment_info.imageView = intermediate_image;
-        color_attachment_info.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-        color_attachment_info.resolveImageView = target_image;
-        color_attachment_info.resolveImageLayout =
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    }
-    else
-    {
-        color_attachment_info.imageView = target_image;
-    }
-
-    return color_attachment_info;
-}
-
-VkRenderingAttachmentInfo vkrndr::vulkan_renderer::setup_depth_attachment(
-    VkClearValue const clear_value,
-    VkImageView const target_image) const
-{
-    VkRenderingAttachmentInfo depth_attachment_info{};
-    depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    depth_attachment_info.pNext = nullptr;
-    depth_attachment_info.imageView = target_image;
-    depth_attachment_info.imageLayout =
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depth_attachment_info.resolveMode = VK_RESOLVE_MODE_NONE;
-    depth_attachment_info.resolveImageView = VK_NULL_HANDLE;
-    depth_attachment_info.resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depth_attachment_info.clearValue = clear_value;
-
-    return depth_attachment_info;
 }

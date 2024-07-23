@@ -41,18 +41,13 @@ namespace soil
     public:
         ~terrain_renderer() override;
 
-    public: // vulkan_scene overrides
-        VkClearValue clear_color() override;
-
-        VkClearValue clear_depth() override;
-
-        vkrndr::vulkan_image* depth_image() override;
-
         void resize(VkExtent2D extent) override;
 
         void update(vkrndr::camera const& camera, float delta_time) override;
 
-        void draw(VkCommandBuffer command_buffer, VkExtent2D extent) override;
+        void draw(VkImageView target_image,
+            VkCommandBuffer command_buffer,
+            VkExtent2D extent) override;
 
         void draw_imgui() override;
 
@@ -75,6 +70,8 @@ namespace soil
 
         VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> pipeline_;
+
+        vkrndr::vulkan_image color_image_;
         vkrndr::vulkan_image depth_buffer_;
 
         vkrndr::vulkan_buffer vertex_index_buffer_;

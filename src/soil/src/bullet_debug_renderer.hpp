@@ -64,17 +64,13 @@ namespace soil
         [[nodiscard]] int getDebugMode() const override;
 
     public: // vulkan_scene overrides
-        [[nodiscard]] VkClearValue clear_color() override;
-
-        [[nodiscard]] VkClearValue clear_depth() override;
-
-        [[nodiscard]] vkrndr::vulkan_image* depth_image() override;
-
         void resize(VkExtent2D extent) override;
 
         void update(vkrndr::camera const& camera, float delta_time) override;
 
-        void draw(VkCommandBuffer command_buffer, VkExtent2D extent) override;
+        void draw(VkImageView target_image,
+            VkCommandBuffer command_buffer,
+            VkExtent2D extent) override;
 
         void draw_imgui() override;
 
@@ -105,6 +101,7 @@ namespace soil
 
         VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> line_pipeline_;
+        vkrndr::vulkan_image color_image_;
         vkrndr::vulkan_image depth_buffer_;
 
         cppext::cycled_buffer<frame_resources> frame_data_;

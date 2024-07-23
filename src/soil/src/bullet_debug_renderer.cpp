@@ -7,6 +7,7 @@
 #include <cppext_pragma_warning.hpp>
 
 #include <vkrndr_camera.hpp>
+#include <vkrndr_render_pass.hpp>
 #include <vulkan_buffer.hpp>
 #include <vulkan_depth_buffer.hpp>
 #include <vulkan_descriptors.hpp>
@@ -137,9 +138,9 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
     : device_{device}
     , renderer_{renderer}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
-    , depth_buffer_{
-          vkrndr::create_depth_buffer(device, renderer->extent(), false)}
 {
+    resize(renderer_->extent());
+
     line_pipeline_ = std::make_unique<vkrndr::vulkan_pipeline>(
         vkrndr::vulkan_pipeline_builder{device_,
             vkrndr::vulkan_pipeline_layout_builder{device_}
@@ -219,6 +220,8 @@ soil::bullet_debug_renderer::~bullet_debug_renderer()
         nullptr);
 
     destroy(device_, &depth_buffer_);
+
+    destroy(device_, &color_image_);
 }
 
 void soil::bullet_debug_renderer::drawLine(btVector3 const& from,
@@ -268,23 +271,20 @@ void soil::bullet_debug_renderer::setDebugMode(int debugMode)
 
 int soil::bullet_debug_renderer::getDebugMode() const { return debug_mode_; }
 
-VkClearValue soil::bullet_debug_renderer::clear_color()
-{
-    return {{{0.0f, 0.0f, 0.0f, 1.f}}};
-}
-
-VkClearValue soil::bullet_debug_renderer::clear_depth()
-{
-    return {.depthStencil = {1.0f, 0}};
-}
-
-vkrndr::vulkan_image* soil::bullet_debug_renderer::depth_image()
-{
-    return &depth_buffer_;
-}
-
 void soil::bullet_debug_renderer::resize(VkExtent2D const extent)
 {
+    destroy(device_, &color_image_);
+    color_image_ = create_image_and_view(device_,
+        extent,
+        1,
+        device_->max_msaa_samples,
+        renderer_->image_format(),
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
     destroy(device_, &depth_buffer_);
     depth_buffer_ = vkrndr::create_depth_buffer(device_, extent, false);
 }
@@ -296,34 +296,51 @@ void soil::bullet_debug_renderer::update(vkrndr::camera const& camera,
         .projection = camera.projection_matrix()};
 }
 
-void soil::bullet_debug_renderer::draw(VkCommandBuffer command_buffer,
+void soil::bullet_debug_renderer::draw(VkImageView target_image,
+    VkCommandBuffer command_buffer,
     VkExtent2D const extent)
 {
-    VkDeviceSize const zero_offset{0};
-    vkCmdBindVertexBuffers(command_buffer,
-        0,
-        1,
-        &frame_data_->vertex_buffer.buffer,
-        &zero_offset);
+    vkrndr::render_pass render_pass;
 
-    VkViewport const viewport{.x = 0.0f,
-        .y = 0.0f,
-        .width = cppext::as_fp(extent.width),
-        .height = cppext::as_fp(extent.height),
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f};
-    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+    render_pass.with_color_attachment(VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        target_image,
+        VkClearValue{{{0.0f, 0.0f, 0.0f, 1.f}}},
+        color_image_.view);
+    render_pass.with_depth_attachment(VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        depth_buffer_.view,
+        VkClearValue{.depthStencil = {1.0f, 0}});
 
-    VkRect2D const scissor{{0, 0}, extent};
-    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+    {
+        auto guard{render_pass.begin(command_buffer, {0, 0, extent})};
 
-    vkrndr::bind_pipeline(command_buffer,
-        *line_pipeline_,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        0,
-        std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
+        VkDeviceSize const zero_offset{0};
+        vkCmdBindVertexBuffers(command_buffer,
+            0,
+            1,
+            &frame_data_->vertex_buffer.buffer,
+            &zero_offset);
 
-    vkCmdDraw(command_buffer, frame_data_->vertex_count, 1, 0, 0);
+        VkViewport const viewport{.x = 0.0f,
+            .y = 0.0f,
+            .width = cppext::as_fp(extent.width),
+            .height = cppext::as_fp(extent.height),
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f};
+        vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+
+        VkRect2D const scissor{{0, 0}, extent};
+        vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+
+        vkrndr::bind_pipeline(command_buffer,
+            *line_pipeline_,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            0,
+            std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
+
+        vkCmdDraw(command_buffer, frame_data_->vertex_count, 1, 0, 0);
+    }
 
     frame_data_.cycle([](auto const&, auto& next) { next.vertex_count = 0; });
 }

@@ -4,6 +4,7 @@
 
 #include <cppext_pragma_warning.hpp>
 
+#include <vkrndr_render_pass.hpp>
 #include <vulkan_depth_buffer.hpp>
 #include <vulkan_descriptors.hpp>
 #include <vulkan_device.hpp>
@@ -122,15 +123,14 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
     : device_{device}
     , renderer_{renderer}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
-    , depth_buffer_{vkrndr::create_depth_buffer(device,
-          renderer->extent(),
-          false)}
     , vertex_count_{cppext::narrow<uint32_t>(
           heightmap.dimension() * heightmap.dimension())}
     , index_offset_{vertex_count_ * sizeof(vertex)}
     , index_count_{cppext::narrow<uint32_t>(
           (heightmap.dimension() - 1) * (heightmap.dimension() - 1) * 6)}
 {
+    resize(renderer_->extent());
+
     pipeline_ = std::make_unique<vkrndr::vulkan_pipeline>(
         vkrndr::vulkan_pipeline_builder{device_,
             vkrndr::vulkan_pipeline_layout_builder{device_}
@@ -185,12 +185,18 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
         {
             for (size_t x{}; x != heightmap.dimension() - 1; ++x)
             {
-                indices[0] = z * heightmap.dimension() + x;
-                indices[1] = (z + 1) * heightmap.dimension() + x;
-                indices[2] = z * heightmap.dimension() + x + 1;
-                indices[3] = z * heightmap.dimension() + x + 1;
-                indices[4] = (z + 1) * heightmap.dimension() + x;
-                indices[5] = (z + 1) * heightmap.dimension() + x + 1;
+                indices[0] =
+                    cppext::narrow<uint16_t>(z * heightmap.dimension() + x);
+                indices[1] = cppext::narrow<uint16_t>(
+                    (z + 1) * heightmap.dimension() + x);
+                indices[2] =
+                    cppext::narrow<uint16_t>(z * heightmap.dimension() + x + 1);
+                indices[3] =
+                    cppext::narrow<uint16_t>(z * heightmap.dimension() + x + 1);
+                indices[4] = cppext::narrow<uint16_t>(
+                    (z + 1) * heightmap.dimension() + x);
+                indices[5] = cppext::narrow<uint16_t>(
+                    (z + 1) * heightmap.dimension() + x + 1);
 
                 indices += 6;
             }
@@ -267,25 +273,24 @@ soil::terrain_renderer::~terrain_renderer()
         nullptr);
 
     destroy(device_, &depth_buffer_);
-}
 
-VkClearValue soil::terrain_renderer::clear_color()
-{
-    return {{{0.0f, 0.0f, 0.0f, 1.f}}};
-}
-
-VkClearValue soil::terrain_renderer::clear_depth()
-{
-    return {.depthStencil = {1.0f, 0}};
-}
-
-vkrndr::vulkan_image* soil::terrain_renderer::depth_image()
-{
-    return &depth_buffer_;
+    destroy(device_, &color_image_);
 }
 
 void soil::terrain_renderer::resize(VkExtent2D extent)
 {
+    destroy(device_, &color_image_);
+    color_image_ = create_image_and_view(device_,
+        extent,
+        1,
+        device_->max_msaa_samples,
+        renderer_->image_format(),
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
     destroy(device_, &depth_buffer_);
     depth_buffer_ = vkrndr::create_depth_buffer(device_, extent, false);
 }
@@ -298,39 +303,56 @@ void soil::terrain_renderer::update(vkrndr::camera const& camera,
     uniform.projection = camera.projection_matrix();
 }
 
-void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
+void soil::terrain_renderer::draw(VkImageView target_image,
+    VkCommandBuffer command_buffer,
     VkExtent2D extent)
 {
-    VkDeviceSize const zero_offset{0};
-    vkCmdBindVertexBuffers(command_buffer,
-        0,
-        1,
-        &vertex_index_buffer_.buffer,
-        &zero_offset);
+    vkrndr::render_pass render_pass;
 
-    vkCmdBindIndexBuffer(command_buffer,
-        vertex_index_buffer_.buffer,
-        index_offset_,
-        VK_INDEX_TYPE_UINT16);
+    render_pass.with_color_attachment(VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        target_image,
+        VkClearValue{{{0.0f, 0.0f, 0.0f, 1.f}}},
+        color_image_.view);
+    render_pass.with_depth_attachment(VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        depth_buffer_.view,
+        VkClearValue{.depthStencil = {1.0f, 0}});
 
-    VkViewport const viewport{.x = 0.0f,
-        .y = 0.0f,
-        .width = cppext::as_fp(extent.width),
-        .height = cppext::as_fp(extent.height),
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f};
-    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+    {
+        auto guard{render_pass.begin(command_buffer, {0, 0, extent})};
 
-    VkRect2D const scissor{{0, 0}, extent};
-    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+        VkDeviceSize const zero_offset{0};
+        vkCmdBindVertexBuffers(command_buffer,
+            0,
+            1,
+            &vertex_index_buffer_.buffer,
+            &zero_offset);
 
-    vkrndr::bind_pipeline(command_buffer,
-        *pipeline_,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        0,
-        std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
+        vkCmdBindIndexBuffer(command_buffer,
+            vertex_index_buffer_.buffer,
+            index_offset_,
+            VK_INDEX_TYPE_UINT16);
 
-    vkCmdDrawIndexed(command_buffer, index_count_, 1, 0, 0, 1);
+        VkViewport const viewport{.x = 0.0f,
+            .y = 0.0f,
+            .width = cppext::as_fp(extent.width),
+            .height = cppext::as_fp(extent.height),
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f};
+        vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+
+        VkRect2D const scissor{{0, 0}, extent};
+        vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+
+        vkrndr::bind_pipeline(command_buffer,
+            *pipeline_,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            0,
+            std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
+
+        vkCmdDrawIndexed(command_buffer, index_count_, 1, 0, 0, 1);
+    }
 
     frame_data_.cycle();
 }
