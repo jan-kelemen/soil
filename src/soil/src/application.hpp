@@ -9,13 +9,19 @@
 #include <niku_application.hpp>
 #include <niku_mouse.hpp>
 
+#include <vulkan_image.hpp>
+#include <vulkan_scene.hpp>
+
 #include <SDL2/SDL_events.h>
+
+#include <vulkan/vulkan_core.h>
 
 #include <memory>
 
 namespace vkrndr
 {
     class vulkan_renderer;
+    class vulkan_scene;
 } // namespace vkrndr
 
 namespace soil
@@ -26,7 +32,9 @@ namespace soil
 
 namespace soil
 {
-    class [[nodiscard]] application final : public niku::application
+    class [[nodiscard]] application final
+        : public niku::application
+        , private vkrndr::vulkan_scene
     {
     public:
         explicit application(bool debug);
@@ -52,11 +60,22 @@ namespace soil
 
         void update(float delta_time) override;
 
-        void render(vkrndr::vulkan_renderer* renderer) override;
+        [[nodiscard]] vkrndr::vulkan_scene* render_scene() override;
 
         void on_startup() override;
 
         void on_shutdown() override;
+
+    public: // vulkan_scene overrides
+        void resize(VkExtent2D extent) override;
+
+        void update(vkrndr::camera const& camera, float delta_time) override;
+
+        void draw(VkImageView target_image,
+            VkCommandBuffer command_buffer,
+            VkExtent2D extent) override;
+
+        void draw_imgui() override;
 
     private:
         physics_engine physics_;
@@ -68,6 +87,9 @@ namespace soil
 
         std::unique_ptr<heightmap> heightmap_;
         std::unique_ptr<terrain_renderer> terrain_renderer_;
+
+        vkrndr::vulkan_image color_image_;
+        vkrndr::vulkan_image depth_buffer_;
     };
 } // namespace soil
 

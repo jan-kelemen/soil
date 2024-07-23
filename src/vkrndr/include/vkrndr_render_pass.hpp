@@ -45,8 +45,8 @@ namespace vkrndr
         render_pass(render_pass&&) noexcept = default;
 
     public:
-        render_pass_guard begin(VkCommandBuffer command_buffer,
-            VkRect2D const& render_area);
+        [[nodiscard]] render_pass_guard begin(VkCommandBuffer command_buffer,
+            VkRect2D const& render_area) const;
 
         render_pass& with_color_attachment(VkAttachmentLoadOp load_operation,
             VkAttachmentStoreOp store_operation,

@@ -32,6 +32,8 @@ namespace soil
     public:
         terrain_renderer(vkrndr::vulkan_device* device,
             vkrndr::vulkan_renderer* renderer,
+            vkrndr::vulkan_image* color_image,
+            vkrndr::vulkan_image* depth_buffer,
             heightmap const& heightmap);
 
         terrain_renderer(terrain_renderer const&) = delete;
@@ -67,12 +69,11 @@ namespace soil
     private:
         vkrndr::vulkan_device* device_;
         vkrndr::vulkan_renderer* renderer_;
+        vkrndr::vulkan_image* color_image_;
+        vkrndr::vulkan_image* depth_buffer_;
 
         VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> pipeline_;
-
-        vkrndr::vulkan_image color_image_;
-        vkrndr::vulkan_image depth_buffer_;
 
         vkrndr::vulkan_buffer vertex_index_buffer_;
         uint32_t vertex_count_{};

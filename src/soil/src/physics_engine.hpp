@@ -12,6 +12,7 @@ class btRigidBody;
 
 namespace vkrndr
 {
+    struct vulkan_image;
     class vulkan_scene;
     struct vulkan_device;
     class vulkan_renderer;
@@ -39,7 +40,9 @@ namespace soil
         [[nodiscard]] vkrndr::vulkan_scene* render_scene();
 
         void attach_renderer(vkrndr::vulkan_device* device,
-            vkrndr::vulkan_renderer* renderer);
+            vkrndr::vulkan_renderer* renderer,
+            vkrndr::vulkan_image* color_image,
+            vkrndr::vulkan_image* depth_buffer);
 
         void detach_renderer(vkrndr::vulkan_device* device,
             vkrndr::vulkan_renderer* renderer);

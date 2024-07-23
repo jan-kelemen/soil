@@ -147,12 +147,47 @@ void vkrndr::vulkan_renderer::imgui_layer(bool const state)
     }
 }
 
-void vkrndr::vulkan_renderer::begin_frame()
+bool vkrndr::vulkan_renderer::begin_frame(vulkan_scene* const scene)
 {
+    if (swap_chain_refresh.load())
+    {
+        if (window_->is_minimized())
+        {
+            return false;
+        }
+
+        vkDeviceWaitIdle(device_->logical);
+        swap_chain_->recreate();
+        scene->resize(extent());
+        swap_chain_refresh.store(false);
+        return false;
+    }
+
+    if (!swap_chain_->acquire_next_image(command_buffers_.index(),
+            image_index_))
+    {
+        return false;
+    }
+
+    submit_buffers_.push_back(*command_buffers_);
+
+    VkCommandBuffer primary_buffer{submit_buffers_[0]};
+
+    check_result(vkResetCommandBuffer(primary_buffer, 0));
+
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    check_result(vkBeginCommandBuffer(primary_buffer, &begin_info));
+
+    wait_for_color_attachment_write(swap_chain_->image(image_index_),
+        primary_buffer);
+
     if (imgui_layer_)
     {
         imgui_layer_->begin_frame();
     }
+
+    return true;
 }
 
 void vkrndr::vulkan_renderer::end_frame()
@@ -161,67 +196,36 @@ void vkrndr::vulkan_renderer::end_frame()
     {
         imgui_layer_->end_frame();
     }
+
+    submit_buffers_.clear();
 }
 
 void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
 {
-    if (swap_chain_refresh.load())
-    {
-        if (window_->is_minimized())
-        {
-            return;
-        }
-
-        vkDeviceWaitIdle(device_->logical);
-        swap_chain_->recreate();
-        scene->resize(extent());
-        swap_chain_refresh.store(false);
-        return;
-    }
-
-    uint32_t image_index{};
-    if (!swap_chain_->acquire_next_image(command_buffers_.index(), image_index))
-    {
-        return;
-    }
-
-    std::vector<VkCommandBuffer> submit_buffers{*command_buffers_};
-
-    VkCommandBuffer primary_buffer{submit_buffers[0]};
-
-    check_result(vkResetCommandBuffer(primary_buffer, 0));
-
-    VkCommandBufferBeginInfo begin_info{};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    check_result(vkBeginCommandBuffer(primary_buffer, &begin_info));
-
-    wait_for_color_attachment_write(swap_chain_->image(image_index),
-        primary_buffer);
-
     VkCommandBuffer secondary_buffer{*secondary_buffers_};
     check_result(vkResetCommandBuffer(secondary_buffer, 0));
-    scene->draw(swap_chain_->image_view(image_index),
+    scene->draw(swap_chain_->image_view(image_index_),
         secondary_buffer,
         extent());
-    vkCmdExecuteCommands(primary_buffer, 1, &secondary_buffer);
+    vkCmdExecuteCommands(submit_buffers_[0], 1, &secondary_buffer);
 
     if (imgui_layer_)
     {
         scene->draw_imgui();
-        submit_buffers.push_back(
-            imgui_layer_->draw(swap_chain_->image(image_index),
-                swap_chain_->image_view(image_index),
+        submit_buffers_.push_back(
+            imgui_layer_->draw(swap_chain_->image(image_index_),
+                swap_chain_->image_view(image_index_),
                 extent()));
     }
 
-    transition_to_present_layout(swap_chain_->image(image_index),
-        primary_buffer);
+    transition_to_present_layout(swap_chain_->image(image_index_),
+        submit_buffers_.front());
 
-    check_result(vkEndCommandBuffer(primary_buffer));
+    check_result(vkEndCommandBuffer(submit_buffers_.front()));
 
-    swap_chain_->submit_command_buffers(submit_buffers,
+    swap_chain_->submit_command_buffers(submit_buffers_,
         command_buffers_.index(),
-        image_index);
+        image_index_);
 
     command_buffers_.cycle();
     secondary_buffers_.cycle();

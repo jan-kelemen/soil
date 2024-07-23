@@ -134,9 +134,13 @@ namespace
 
 soil::bullet_debug_renderer::bullet_debug_renderer(
     vkrndr::vulkan_device* const device,
-    vkrndr::vulkan_renderer* const renderer)
+    vkrndr::vulkan_renderer* const renderer,
+    vkrndr::vulkan_image* color_image,
+    vkrndr::vulkan_image* depth_buffer)
     : device_{device}
     , renderer_{renderer}
+    , color_image_{color_image}
+    , depth_buffer_{depth_buffer}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
 {
     resize(renderer_->extent());
@@ -156,7 +160,7 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
             .with_primitive_topology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST)
             .with_rasterization_samples(device_->max_msaa_samples)
             .add_vertex_input(binding_description(), attribute_descriptions())
-            .with_depth_test(depth_buffer_.format)
+            .with_depth_test(depth_buffer_->format)
             .build());
 
     frame_data_ =
@@ -218,10 +222,6 @@ soil::bullet_debug_renderer::~bullet_debug_renderer()
     vkDestroyDescriptorSetLayout(device_->logical,
         descriptor_set_layout_,
         nullptr);
-
-    destroy(device_, &depth_buffer_);
-
-    destroy(device_, &color_image_);
 }
 
 void soil::bullet_debug_renderer::drawLine(btVector3 const& from,
@@ -271,23 +271,7 @@ void soil::bullet_debug_renderer::setDebugMode(int debugMode)
 
 int soil::bullet_debug_renderer::getDebugMode() const { return debug_mode_; }
 
-void soil::bullet_debug_renderer::resize(VkExtent2D const extent)
-{
-    destroy(device_, &color_image_);
-    color_image_ = create_image_and_view(device_,
-        extent,
-        1,
-        device_->max_msaa_samples,
-        renderer_->image_format(),
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-
-    destroy(device_, &depth_buffer_);
-    depth_buffer_ = vkrndr::create_depth_buffer(device_, extent, false);
-}
+void soil::bullet_debug_renderer::resize(VkExtent2D const extent) { }
 
 void soil::bullet_debug_renderer::update(vkrndr::camera const& camera,
     [[maybe_unused]] float const delta_time)
@@ -302,15 +286,14 @@ void soil::bullet_debug_renderer::draw(VkImageView target_image,
 {
     vkrndr::render_pass render_pass;
 
-    render_pass.with_color_attachment(VK_ATTACHMENT_LOAD_OP_CLEAR,
+    render_pass.with_color_attachment(VK_ATTACHMENT_LOAD_OP_LOAD,
         VK_ATTACHMENT_STORE_OP_STORE,
         target_image,
-        VkClearValue{{{0.0f, 0.0f, 0.0f, 1.f}}},
-        color_image_.view);
-    render_pass.with_depth_attachment(VK_ATTACHMENT_LOAD_OP_CLEAR,
+        std::nullopt,
+        color_image_->view);
+    render_pass.with_depth_attachment(VK_ATTACHMENT_LOAD_OP_LOAD,
         VK_ATTACHMENT_STORE_OP_STORE,
-        depth_buffer_.view,
-        VkClearValue{.depthStencil = {1.0f, 0}});
+        depth_buffer_->view);
 
     {
         auto guard{render_pass.begin(command_buffer, {0, 0, extent})};

@@ -156,17 +156,24 @@ void niku::application::run()
 
         last_tick = current_tick;
 
-        impl_->renderer->begin_frame();
         begin_frame();
+
         if (do_fixed_update)
         {
             last_fixed_tick = current_tick;
             fixed_update(fixed_delta);
         }
+
         update(delta);
-        render(impl_->renderer.get());
+
+        if (vkrndr::vulkan_scene* const scene{render_scene()};
+            impl_->renderer->begin_frame(scene))
+        {
+            impl_->renderer->draw(scene);
+            impl_->renderer->end_frame();
+        }
+
         end_frame();
-        impl_->renderer->end_frame();
     }
 
     vkDeviceWaitIdle(impl_->device.logical);

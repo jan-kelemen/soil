@@ -119,9 +119,13 @@ namespace
 
 soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
     vkrndr::vulkan_renderer* renderer,
+    vkrndr::vulkan_image* color_image,
+    vkrndr::vulkan_image* depth_buffer,
     heightmap const& heightmap)
     : device_{device}
     , renderer_{renderer}
+    , color_image_{color_image}
+    , depth_buffer_{depth_buffer}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
     , vertex_count_{cppext::narrow<uint32_t>(
           heightmap.dimension() * heightmap.dimension())}
@@ -144,7 +148,7 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             .with_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
             .with_rasterization_samples(device_->max_msaa_samples)
             .add_vertex_input(binding_description(), attribute_descriptions())
-            .with_depth_test(depth_buffer_.format)
+            .with_depth_test(depth_buffer_->format)
             .with_culling(VK_CULL_MODE_BACK_BIT,
                 VK_FRONT_FACE_COUNTER_CLOCKWISE)
             .build());
@@ -271,29 +275,9 @@ soil::terrain_renderer::~terrain_renderer()
     vkDestroyDescriptorSetLayout(device_->logical,
         descriptor_set_layout_,
         nullptr);
-
-    destroy(device_, &depth_buffer_);
-
-    destroy(device_, &color_image_);
 }
 
-void soil::terrain_renderer::resize(VkExtent2D extent)
-{
-    destroy(device_, &color_image_);
-    color_image_ = create_image_and_view(device_,
-        extent,
-        1,
-        device_->max_msaa_samples,
-        renderer_->image_format(),
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-
-    destroy(device_, &depth_buffer_);
-    depth_buffer_ = vkrndr::create_depth_buffer(device_, extent, false);
-}
+void soil::terrain_renderer::resize(VkExtent2D extent) { }
 
 void soil::terrain_renderer::update(vkrndr::camera const& camera,
     [[maybe_unused]] float delta_time)
@@ -313,10 +297,10 @@ void soil::terrain_renderer::draw(VkImageView target_image,
         VK_ATTACHMENT_STORE_OP_STORE,
         target_image,
         VkClearValue{{{0.0f, 0.0f, 0.0f, 1.f}}},
-        color_image_.view);
+        color_image_->view);
     render_pass.with_depth_attachment(VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
-        depth_buffer_.view,
+        depth_buffer_->view,
         VkClearValue{.depthStencil = {1.0f, 0}});
 
     {

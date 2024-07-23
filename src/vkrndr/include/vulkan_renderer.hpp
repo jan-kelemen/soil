@@ -57,7 +57,7 @@ namespace vkrndr
 
         void imgui_layer(bool state);
 
-        void begin_frame();
+        [[nodiscard]] bool begin_frame(vulkan_scene* scene);
 
         void end_frame();
 
@@ -99,6 +99,9 @@ namespace vkrndr
         std::unique_ptr<imgui_render_layer> imgui_layer_;
         std::unique_ptr<font_manager> font_manager_;
         std::unique_ptr<gltf_manager> gltf_manager_;
+
+        std::vector<VkCommandBuffer> submit_buffers_;
+        uint32_t image_index_{};
     };
 } // namespace vkrndr
 

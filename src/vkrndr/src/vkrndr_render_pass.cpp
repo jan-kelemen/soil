@@ -17,22 +17,13 @@ vkrndr::render_pass_guard::~render_pass_guard()
     if (command_buffer_ != VK_NULL_HANDLE)
     {
         vkCmdEndRendering(command_buffer_);
-        vkEndCommandBuffer(command_buffer_);
     }
 }
 
 vkrndr::render_pass_guard vkrndr::render_pass::begin(
     VkCommandBuffer command_buffer,
-    VkRect2D const& render_area)
+    VkRect2D const& render_area) const
 {
-    VkCommandBufferInheritanceInfo inheritance_info{};
-    inheritance_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-
-    VkCommandBufferBeginInfo secondary_begin_info{};
-    secondary_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    secondary_begin_info.pInheritanceInfo = &inheritance_info;
-    check_result(vkBeginCommandBuffer(command_buffer, &secondary_begin_info));
-
     VkRenderingInfo render_info{};
     render_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
     render_info.renderArea = render_area;

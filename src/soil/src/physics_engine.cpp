@@ -42,7 +42,9 @@ public:
     [[nodiscard]] vkrndr::vulkan_scene* render_scene();
 
     void attach_renderer(vkrndr::vulkan_device* device,
-        vkrndr::vulkan_renderer* renderer);
+        vkrndr::vulkan_renderer* renderer,
+        vkrndr::vulkan_image* color_image,
+        vkrndr::vulkan_image* depth_buffer);
 
     void detach_renderer(vkrndr::vulkan_device* device,
         vkrndr::vulkan_renderer* renderer);
@@ -129,9 +131,14 @@ vkrndr::vulkan_scene* soil::physics_engine::impl::render_scene()
 
 void soil::physics_engine::impl::attach_renderer(
     vkrndr::vulkan_device* const device,
-    vkrndr::vulkan_renderer* const renderer)
+    vkrndr::vulkan_renderer* const renderer,
+    vkrndr::vulkan_image* const color_image,
+    vkrndr::vulkan_image* const depth_buffer)
 {
-    debug_renderer_ = std::make_unique<bullet_debug_renderer>(device, renderer);
+    debug_renderer_ = std::make_unique<bullet_debug_renderer>(device,
+        renderer,
+        color_image,
+        depth_buffer);
     world_.setDebugDrawer(debug_renderer_.get());
 }
 
@@ -203,9 +210,11 @@ vkrndr::vulkan_scene* soil::physics_engine::render_scene()
 }
 
 void soil::physics_engine::attach_renderer(vkrndr::vulkan_device* const device,
-    vkrndr::vulkan_renderer* const renderer)
+    vkrndr::vulkan_renderer* const renderer,
+    vkrndr::vulkan_image* const color_image,
+    vkrndr::vulkan_image* const depth_buffer)
 {
-    impl_->attach_renderer(device, renderer);
+    impl_->attach_renderer(device, renderer, color_image, depth_buffer);
 }
 
 void soil::physics_engine::detach_renderer(vkrndr::vulkan_device* const device,

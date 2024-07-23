@@ -34,7 +34,9 @@ namespace soil
     {
     public:
         bullet_debug_renderer(vkrndr::vulkan_device* device,
-            vkrndr::vulkan_renderer* renderer);
+            vkrndr::vulkan_renderer* renderer,
+            vkrndr::vulkan_image* color_image,
+            vkrndr::vulkan_image* depth_buffer);
 
         bullet_debug_renderer(bullet_debug_renderer const&) = delete;
 
@@ -98,11 +100,11 @@ namespace soil
     private: // Render data
         vkrndr::vulkan_device* device_;
         vkrndr::vulkan_renderer* renderer_;
+        vkrndr::vulkan_image* color_image_;
+        vkrndr::vulkan_image* depth_buffer_;
 
         VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> line_pipeline_;
-        vkrndr::vulkan_image color_image_;
-        vkrndr::vulkan_image depth_buffer_;
 
         cppext::cycled_buffer<frame_resources> frame_data_;
     };
