@@ -72,6 +72,11 @@ namespace soil
         vkrndr::vulkan_image* color_image_;
         vkrndr::vulkan_image* depth_buffer_;
 
+        vkrndr::vulkan_image texture_;
+        vkrndr::vulkan_image texture_normal_;
+
+        VkSampler texture_sampler_;
+
         VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> pipeline_;
 

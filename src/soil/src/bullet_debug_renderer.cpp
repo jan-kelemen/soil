@@ -271,7 +271,10 @@ void soil::bullet_debug_renderer::setDebugMode(int debugMode)
 
 int soil::bullet_debug_renderer::getDebugMode() const { return debug_mode_; }
 
-void soil::bullet_debug_renderer::resize(VkExtent2D const extent) { }
+void soil::bullet_debug_renderer::resize(
+    [[maybe_unused]] VkExtent2D const extent)
+{
+}
 
 void soil::bullet_debug_renderer::update(vkrndr::camera const& camera,
     [[maybe_unused]] float const delta_time)

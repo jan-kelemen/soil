@@ -45,16 +45,16 @@ std::span<float const> soil::heightmap::data() const { return data_; }
 
 std::unique_ptr<btCollisionShape> soil::heightmap::collision_shape() const
 {
-    auto heightfield_shape{
-        std::make_unique<btHeightfieldTerrainShape>(dimension_,
-            dimension_,
-            data_.data(),
-            1.0f,
-            0.0f,
-            1.0f,
-            1,
-            PHY_FLOAT,
-            false)};
+    auto heightfield_shape{std::make_unique<btHeightfieldTerrainShape>(
+        cppext::narrow<int>(dimension_),
+        cppext::narrow<int>(dimension_),
+        data_.data(),
+        1.0f,
+        0.0f,
+        1.0f,
+        1,
+        PHY_FLOAT,
+        false)};
     heightfield_shape->setLocalScaling(soil::to_bullet(scaling_));
 
     return heightfield_shape;

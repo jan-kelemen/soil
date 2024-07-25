@@ -30,7 +30,7 @@ namespace
     struct [[nodiscard]] vertex final
     {
         alignas(16) glm::vec3 position;
-        alignas(16) glm::vec3 color;
+        alignas(16) glm::vec2 texture_coordinate;
     };
 
     DISABLE_WARNING_POP
@@ -47,7 +47,8 @@ namespace
         constexpr std::array descriptions{
             VkVertexInputBindingDescription{.binding = 0,
                 .stride = sizeof(vertex),
-                .inputRate = VK_VERTEX_INPUT_RATE_VERTEX}};
+                .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
+        };
 
         return descriptions;
     }
@@ -61,11 +62,43 @@ namespace
                 .offset = offsetof(vertex, position)},
             VkVertexInputAttributeDescription{.location = 1,
                 .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
-                .offset = offsetof(vertex, color)},
+                .format = VK_FORMAT_R32G32_SFLOAT,
+                .offset = offsetof(vertex, texture_coordinate)},
         };
 
         return descriptions;
+    }
+
+    [[nodiscard]] VkSampler create_texture_sampler(
+        vkrndr::vulkan_device const* const device,
+        uint32_t const mip_levels = 1)
+    {
+        VkPhysicalDeviceProperties properties; // NOLINT
+        vkGetPhysicalDeviceProperties(device->physical, &properties);
+
+        VkSamplerCreateInfo sampler_info{};
+        sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        sampler_info.magFilter = VK_FILTER_LINEAR;
+        sampler_info.minFilter = VK_FILTER_LINEAR;
+        sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_info.anisotropyEnable = VK_TRUE;
+        sampler_info.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+        sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+        sampler_info.unnormalizedCoordinates = VK_FALSE;
+        sampler_info.compareEnable = VK_FALSE;
+        sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+        sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        sampler_info.mipLodBias = 0.0f;
+        sampler_info.minLod = 0.0f;
+        sampler_info.maxLod = static_cast<float>(mip_levels);
+
+        VkSampler rv; // NOLINT
+        vkrndr::check_result(
+            vkCreateSampler(device->logical, &sampler_info, nullptr, &rv));
+
+        return rv;
     }
 
     [[nodiscard]] VkDescriptorSetLayout create_descriptor_set_layout(
@@ -78,7 +111,16 @@ namespace
         vertex_uniform_binding.descriptorCount = 1;
         vertex_uniform_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        std::array const bindings{vertex_uniform_binding};
+        VkDescriptorSetLayoutBinding sampler_layout_binding{};
+        sampler_layout_binding.binding = 1;
+        sampler_layout_binding.descriptorCount = 1;
+        sampler_layout_binding.descriptorType =
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        sampler_layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        sampler_layout_binding.pImmutableSamplers = nullptr;
+
+        std::array const bindings{vertex_uniform_binding,
+            sampler_layout_binding};
 
         VkDescriptorSetLayoutCreateInfo layout_info{};
         layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -96,7 +138,8 @@ namespace
 
     void bind_descriptor_set(vkrndr::vulkan_device const* const device,
         VkDescriptorSet const& descriptor_set,
-        VkDescriptorBufferInfo const vertex_uniform_info)
+        VkDescriptorBufferInfo const vertex_uniform_info,
+        VkDescriptorImageInfo const texture_image_info)
     {
         VkWriteDescriptorSet vertex_uniform_write{};
         vertex_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -107,7 +150,18 @@ namespace
         vertex_uniform_write.descriptorCount = 1;
         vertex_uniform_write.pBufferInfo = &vertex_uniform_info;
 
-        std::array const descriptor_writes{vertex_uniform_write};
+        VkWriteDescriptorSet texture_descriptor_write{};
+        texture_descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        texture_descriptor_write.dstSet = descriptor_set;
+        texture_descriptor_write.dstBinding = 1;
+        texture_descriptor_write.dstArrayElement = 0;
+        texture_descriptor_write.descriptorType =
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        texture_descriptor_write.descriptorCount = 1;
+        texture_descriptor_write.pImageInfo = &texture_image_info;
+
+        std::array const descriptor_writes{vertex_uniform_write,
+            texture_descriptor_write};
 
         vkUpdateDescriptorSets(device->logical,
             vkrndr::count_cast(descriptor_writes.size()),
@@ -126,6 +180,10 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
     , renderer_{renderer}
     , color_image_{color_image}
     , depth_buffer_{depth_buffer}
+    , texture_{renderer->load_texture("coast_sand_rocks_02_diff_1k.jpg")}
+    , texture_normal_{renderer->load_texture(
+          "coast_sand_rocks_02_nor_gl_1k.jpg")}
+    , texture_sampler_{create_texture_sampler(device)}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
     , vertex_count_{cppext::narrow<uint32_t>(
           heightmap.dimension() * heightmap.dimension())}
@@ -180,7 +238,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
                     .position = {cppext::as_fp(x),
                         heightmap.value(x, y),
                         cppext::as_fp(y)},
-                    .color = {1.0f, 1.0f, 1.0f}};
+                    .texture_coordinate = {cppext::as_fp(x % 2),
+                        cppext::as_fp(y % 2)}};
             }
         }
 
@@ -250,7 +309,10 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             data.descriptor_set,
             VkDescriptorBufferInfo{.buffer = data.vertex_uniform.buffer,
                 .offset = 0,
-                .range = uniform_buffer_size});
+                .range = uniform_buffer_size},
+            VkDescriptorImageInfo{.sampler = texture_sampler_,
+                .imageView = texture_.view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
     }
 }
 
@@ -275,9 +337,14 @@ soil::terrain_renderer::~terrain_renderer()
     vkDestroyDescriptorSetLayout(device_->logical,
         descriptor_set_layout_,
         nullptr);
+
+    destroy(device_, &texture_);
+    destroy(device_, &texture_normal_);
+
+    vkDestroySampler(device_->logical, texture_sampler_, nullptr);
 }
 
-void soil::terrain_renderer::resize(VkExtent2D extent) { }
+void soil::terrain_renderer::resize([[maybe_unused]] VkExtent2D extent) { }
 
 void soil::terrain_renderer::update(vkrndr::camera const& camera,
     [[maybe_unused]] float delta_time)

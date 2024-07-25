@@ -23,8 +23,7 @@ glm::ivec2 niku::mouse::position() const
 glm::ivec2 niku::mouse::relative_offset() const
 {
     glm::ivec2 rv;
-    auto const state{SDL_GetRelativeMouseState(&rv.x, &rv.y)};
-    assert(state >= 0);
+    SDL_GetRelativeMouseState(&rv.x, &rv.y);
     return rv;
 }
 
