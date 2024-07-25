@@ -51,7 +51,7 @@ soil::application::application(bool debug)
     fixed_update_interval(1.0f / 60.0f);
 
     camera_.resize({512, 512});
-    camera_.set_position({-15.0f, 15.0f, -15.0f});
+    camera_.set_position({0.0f, 1.76f, 0.0f});
     camera_.update();
 
     resize({512, 512});
@@ -111,7 +111,7 @@ void soil::application::on_startup()
     {
         btTransform transform;
         transform.setIdentity();
-        transform.setOrigin({-1.0f, 10.0f, -1.0f});
+        transform.setOrigin({0.0f, 10.0f, 0.0f});
 
         auto* const cube{physics_.add_rigid_body(
             std::make_unique<btBoxShape>(btVector3{0.5f, 0.5f, 0.5f}),

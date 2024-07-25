@@ -62,7 +62,9 @@ namespace soil
         struct [[nodiscard]] frame_resources final
         {
             vkrndr::vulkan_buffer vertex_uniform;
-            vkrndr::mapped_memory uniform_map{};
+            vkrndr::mapped_memory vertex_uniform_map{};
+            vkrndr::vulkan_buffer view_uniform;
+            vkrndr::mapped_memory view_uniform_map{};
             VkDescriptorSet descriptor_set{VK_NULL_HANDLE};
         };
 
@@ -80,10 +82,8 @@ namespace soil
         VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> pipeline_;
 
-        vkrndr::vulkan_buffer vertex_index_buffer_;
+        vkrndr::vulkan_buffer vertex_buffer_;
         uint32_t vertex_count_{};
-        VkDeviceSize index_offset_{};
-        uint32_t index_count_{};
 
         cppext::cycled_buffer<frame_resources> frame_data_;
     };

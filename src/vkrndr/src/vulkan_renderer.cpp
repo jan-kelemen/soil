@@ -232,7 +232,8 @@ void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
 }
 
 vkrndr::vulkan_image vkrndr::vulkan_renderer::load_texture(
-    std::filesystem::path const& texture_path)
+    std::filesystem::path const& texture_path,
+    VkFormat const format)
 {
     int width; // NOLINT
     int height; // NOLINT
@@ -255,7 +256,8 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::load_texture(
         std::span{reinterpret_cast<std::byte const*>(pixels), image_size}};
     // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
     vulkan_image rv{transfer_image(image_bytes,
-        {cppext::narrow<uint32_t>(width), cppext::narrow<uint32_t>(height)})};
+        {cppext::narrow<uint32_t>(width), cppext::narrow<uint32_t>(height)},
+        format)};
 
     stbi_image_free(pixels);
 
@@ -264,7 +266,8 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::load_texture(
 
 vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
     std::span<std::byte const> image_data,
-    VkExtent2D const extent)
+    VkExtent2D const extent,
+    VkFormat const format)
 {
     vulkan_buffer staging_buffer{create_buffer(device_,
         image_data.size(),
@@ -280,7 +283,7 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
         extent,
         1,
         VK_SAMPLE_COUNT_1_BIT,
-        VK_FORMAT_R8G8B8A8_SRGB,
+        format,
         VK_IMAGE_TILING_LINEAR,
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
             VK_IMAGE_USAGE_SAMPLED_BIT,

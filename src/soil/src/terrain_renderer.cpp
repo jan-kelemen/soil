@@ -1,6 +1,7 @@
 #include <terrain_renderer.hpp>
 
 #include <heightmap.hpp>
+#include <perspective_camera.hpp>
 
 #include <cppext_pragma_warning.hpp>
 
@@ -12,8 +13,11 @@
 #include <vulkan_renderer.hpp>
 #include <vulkan_utility.hpp>
 
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
+
+#include <imgui.h>
 
 #include <spdlog/spdlog.h>
 
@@ -31,6 +35,7 @@ namespace
     {
         alignas(16) glm::vec3 position;
         alignas(16) glm::vec2 texture_coordinate;
+        alignas(16) glm::vec3 tangent;
     };
 
     DISABLE_WARNING_POP
@@ -42,13 +47,23 @@ namespace
         glm::mat4 projection;
     };
 
+    DISABLE_WARNING_PUSH
+    DISABLE_WARNING_STRUCTURE_WAS_PADDED_DUE_TO_ALIGNMENT_SPECIFIER
+
+    struct [[nodiscard]] view final
+    {
+        alignas(16) glm::vec3 camera_position;
+        alignas(16) glm::vec3 light_position;
+    };
+
+    DISABLE_WARNING_POP
+
     consteval auto binding_description()
     {
         constexpr std::array descriptions{
             VkVertexInputBindingDescription{.binding = 0,
                 .stride = sizeof(vertex),
-                .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        };
+                .inputRate = VK_VERTEX_INPUT_RATE_VERTEX}};
 
         return descriptions;
     }
@@ -64,6 +79,10 @@ namespace
                 .binding = 0,
                 .format = VK_FORMAT_R32G32_SFLOAT,
                 .offset = offsetof(vertex, texture_coordinate)},
+            VkVertexInputAttributeDescription{.location = 2,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .offset = offsetof(vertex, tangent)},
         };
 
         return descriptions;
@@ -111,16 +130,36 @@ namespace
         vertex_uniform_binding.descriptorCount = 1;
         vertex_uniform_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        VkDescriptorSetLayoutBinding sampler_layout_binding{};
-        sampler_layout_binding.binding = 1;
-        sampler_layout_binding.descriptorCount = 1;
-        sampler_layout_binding.descriptorType =
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        sampler_layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        sampler_layout_binding.pImmutableSamplers = nullptr;
+        VkDescriptorSetLayoutBinding view_uniform_binding{};
+        view_uniform_binding.binding = 1;
+        view_uniform_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        view_uniform_binding.descriptorCount = 1;
+        view_uniform_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutBinding texture_image_binding{};
+        texture_image_binding.binding = 2;
+        texture_image_binding.descriptorCount = 1;
+        texture_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        texture_image_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        texture_image_binding.pImmutableSamplers = nullptr;
+
+        VkDescriptorSetLayoutBinding normal_image_binding{};
+        normal_image_binding.binding = 3;
+        normal_image_binding.descriptorCount = 1;
+        normal_image_binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        normal_image_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutBinding texture_sampler_binding{};
+        texture_sampler_binding.binding = 4;
+        texture_sampler_binding.descriptorCount = 1;
+        texture_sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+        texture_sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         std::array const bindings{vertex_uniform_binding,
-            sampler_layout_binding};
+            view_uniform_binding,
+            texture_image_binding,
+            normal_image_binding,
+            texture_sampler_binding};
 
         VkDescriptorSetLayoutCreateInfo layout_info{};
         layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -139,7 +178,10 @@ namespace
     void bind_descriptor_set(vkrndr::vulkan_device const* const device,
         VkDescriptorSet const& descriptor_set,
         VkDescriptorBufferInfo const vertex_uniform_info,
-        VkDescriptorImageInfo const texture_image_info)
+        VkDescriptorBufferInfo const view_uniform_info,
+        VkDescriptorImageInfo const texture_image_info,
+        VkDescriptorImageInfo const normal_image_info,
+        VkDescriptorImageInfo const sampler_image_info)
     {
         VkWriteDescriptorSet vertex_uniform_write{};
         vertex_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -150,18 +192,49 @@ namespace
         vertex_uniform_write.descriptorCount = 1;
         vertex_uniform_write.pBufferInfo = &vertex_uniform_info;
 
+        VkWriteDescriptorSet view_uniform_write{};
+        view_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        view_uniform_write.dstSet = descriptor_set;
+        view_uniform_write.dstBinding = 1;
+        view_uniform_write.dstArrayElement = 0;
+        view_uniform_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        view_uniform_write.descriptorCount = 1;
+        view_uniform_write.pBufferInfo = &view_uniform_info;
+
         VkWriteDescriptorSet texture_descriptor_write{};
         texture_descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         texture_descriptor_write.dstSet = descriptor_set;
-        texture_descriptor_write.dstBinding = 1;
+        texture_descriptor_write.dstBinding = 2;
         texture_descriptor_write.dstArrayElement = 0;
         texture_descriptor_write.descriptorType =
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         texture_descriptor_write.descriptorCount = 1;
         texture_descriptor_write.pImageInfo = &texture_image_info;
 
+        VkWriteDescriptorSet normal_descriptor_write{};
+        normal_descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        normal_descriptor_write.dstSet = descriptor_set;
+        normal_descriptor_write.dstBinding = 3;
+        normal_descriptor_write.dstArrayElement = 0;
+        normal_descriptor_write.descriptorType =
+            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        normal_descriptor_write.descriptorCount = 1;
+        normal_descriptor_write.pImageInfo = &normal_image_info;
+
+        VkWriteDescriptorSet sampler_descriptor_write{};
+        sampler_descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        sampler_descriptor_write.dstSet = descriptor_set;
+        sampler_descriptor_write.dstBinding = 4;
+        sampler_descriptor_write.dstArrayElement = 0;
+        sampler_descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+        sampler_descriptor_write.descriptorCount = 1;
+        sampler_descriptor_write.pImageInfo = &sampler_image_info;
+
         std::array const descriptor_writes{vertex_uniform_write,
-            texture_descriptor_write};
+            view_uniform_write,
+            texture_descriptor_write,
+            normal_descriptor_write,
+            sampler_descriptor_write};
 
         vkUpdateDescriptorSets(device->logical,
             vkrndr::count_cast(descriptor_writes.size()),
@@ -180,15 +253,14 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
     , renderer_{renderer}
     , color_image_{color_image}
     , depth_buffer_{depth_buffer}
-    , texture_{renderer->load_texture("coast_sand_rocks_02_diff_1k.jpg")}
+    , texture_{renderer->load_texture("coast_sand_rocks_02_diff_1k.jpg",
+          VK_FORMAT_R8G8B8A8_SRGB)}
     , texture_normal_{renderer->load_texture(
-          "coast_sand_rocks_02_nor_gl_1k.jpg")}
+          "coast_sand_rocks_02_nor_gl_1k.jpg",
+          VK_FORMAT_R8G8B8A8_UNORM)}
     , texture_sampler_{create_texture_sampler(device)}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
     , vertex_count_{cppext::narrow<uint32_t>(
-          heightmap.dimension() * heightmap.dimension())}
-    , index_offset_{vertex_count_ * sizeof(vertex)}
-    , index_count_{cppext::narrow<uint32_t>(
           (heightmap.dimension() - 1) * (heightmap.dimension() - 1) * 6)}
 {
     resize(renderer_->extent());
@@ -211,9 +283,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
                 VK_FRONT_FACE_COUNTER_CLOCKWISE)
             .build());
 
-    auto const vertex_buffer_size{
-        vertex_count_ * sizeof(vertex) + index_count_ * sizeof(uint16_t)};
-    vertex_index_buffer_ = vkrndr::create_buffer(device_,
+    auto const vertex_buffer_size{vertex_count_ * sizeof(vertex)};
+    vertex_buffer_ = vkrndr::create_buffer(device_,
         vertex_buffer_size,
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
             VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -228,46 +299,60 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
         vkrndr::mapped_memory staging_map{
             vkrndr::map_memory(device_, staging_buffer.allocation)};
 
-        auto* const vertices{staging_map.as<vertex>()};
-        auto const heightmap_data{heightmap.data()};
-        for (size_t y{}; y != heightmap.dimension(); ++y)
+        auto* vertices{staging_map.as<vertex>()};
+        auto const create_vertex = [&heightmap](size_t const x, size_t const z)
         {
-            for (size_t x{}; x != heightmap.dimension(); ++x)
-            {
-                vertices[y * heightmap.dimension() + x] = {
-                    .position = {cppext::as_fp(x),
-                        heightmap.value(x, y),
-                        cppext::as_fp(y)},
-                    .texture_coordinate = {cppext::as_fp(x % 2),
-                        cppext::as_fp(y % 2)}};
-            }
-        }
-
-        auto* indices{staging_map.as<uint16_t>(index_offset_)};
+            return vertex{.position = {cppext::as_fp(x),
+                              heightmap.value(x, z),
+                              cppext::as_fp(z)},
+                .texture_coordinate = {cppext::as_fp(x % 2),
+                    cppext::as_fp(z % 2)}};
+        };
         for (size_t z{}; z != heightmap.dimension() - 1; ++z)
         {
             for (size_t x{}; x != heightmap.dimension() - 1; ++x)
             {
-                indices[0] =
-                    cppext::narrow<uint16_t>(z * heightmap.dimension() + x);
-                indices[1] = cppext::narrow<uint16_t>(
-                    (z + 1) * heightmap.dimension() + x);
-                indices[2] =
-                    cppext::narrow<uint16_t>(z * heightmap.dimension() + x + 1);
-                indices[3] =
-                    cppext::narrow<uint16_t>(z * heightmap.dimension() + x + 1);
-                indices[4] = cppext::narrow<uint16_t>(
-                    (z + 1) * heightmap.dimension() + x);
-                indices[5] = cppext::narrow<uint16_t>(
-                    (z + 1) * heightmap.dimension() + x + 1);
+                vertices[0] = create_vertex(x, z);
+                vertices[1] = create_vertex(x, z + 1);
+                vertices[2] = create_vertex(x + 1, z);
+                vertices[3] = create_vertex(x + 1, z);
+                vertices[4] = create_vertex(x, z + 1);
+                vertices[5] = create_vertex(x + 1, z + 1);
 
-                indices += 6;
+                vertices += 6;
             }
+        }
+        vertices = staging_map.as<vertex>();
+
+        for (uint32_t i{}; i != vertex_count_; i += 3)
+        {
+            vertex const& point1{vertices[i]};
+            vertex const& point2{vertices[i + 1]};
+            vertex const& point3{vertices[i + 2]};
+
+            glm::vec3 const edge1{point2.position - point1.position};
+            glm::vec3 const edge2{point3.position - point1.position};
+
+            glm::vec2 const delta_texture1{
+                point2.texture_coordinate - point1.texture_coordinate};
+            glm::vec2 const delta_texture2{
+                point3.texture_coordinate - point1.texture_coordinate};
+
+            float const f{1.0f /
+                (delta_texture1.x * delta_texture2.y -
+                    delta_texture2.x * delta_texture1.y)};
+
+            glm::vec3 tan{
+                (edge1 * delta_texture2.y - edge2 * delta_texture1.y) * f};
+
+            vertices[i].tangent = tan;
+            vertices[i + 1].tangent = tan;
+            vertices[i + 2].tangent = tan;
         }
 
         vkrndr::unmap_memory(device_, &staging_map);
 
-        renderer_->transfer_buffer(staging_buffer, vertex_index_buffer_);
+        renderer_->transfer_buffer(staging_buffer, vertex_buffer_);
 
         destroy(device_, &staging_buffer);
     }
@@ -296,9 +381,18 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        data.uniform_map =
+        data.vertex_uniform_map =
             vkrndr::map_memory(device, data.vertex_uniform.allocation);
-        data.uniform_map.as<transform>()->model = model_matrix;
+        data.vertex_uniform_map.as<transform>()->model = model_matrix;
+
+        auto const view_buffer_size{sizeof(view)};
+        data.view_uniform = create_buffer(device_,
+            view_buffer_size,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        data.view_uniform_map =
+            vkrndr::map_memory(device, data.view_uniform.allocation);
 
         create_descriptor_sets(device_,
             descriptor_set_layout_,
@@ -310,9 +404,14 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             VkDescriptorBufferInfo{.buffer = data.vertex_uniform.buffer,
                 .offset = 0,
                 .range = uniform_buffer_size},
-            VkDescriptorImageInfo{.sampler = texture_sampler_,
-                .imageView = texture_.view,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+            VkDescriptorBufferInfo{.buffer = data.view_uniform.buffer,
+                .offset = 0,
+                .range = view_buffer_size},
+            VkDescriptorImageInfo{.imageView = texture_.view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+            VkDescriptorImageInfo{.imageView = texture_normal_.view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+            VkDescriptorImageInfo{.sampler = texture_sampler_});
     }
 }
 
@@ -325,11 +424,14 @@ soil::terrain_renderer::~terrain_renderer()
             1,
             &data.descriptor_set);
 
-        unmap_memory(device_, &data.uniform_map);
+        unmap_memory(device_, &data.view_uniform_map);
+        destroy(device_, &data.view_uniform);
+
+        unmap_memory(device_, &data.vertex_uniform_map);
         destroy(device_, &data.vertex_uniform);
     }
 
-    destroy(device_, &vertex_index_buffer_);
+    destroy(device_, &vertex_buffer_);
 
     destroy(device_, pipeline_.get());
     pipeline_ = nullptr;
@@ -349,9 +451,14 @@ void soil::terrain_renderer::resize([[maybe_unused]] VkExtent2D extent) { }
 void soil::terrain_renderer::update(vkrndr::camera const& camera,
     [[maybe_unused]] float delta_time)
 {
-    auto& uniform{*frame_data_->uniform_map.as<transform>()};
+    auto& uniform{*frame_data_->vertex_uniform_map.as<transform>()};
     uniform.view = camera.view_matrix();
     uniform.projection = camera.projection_matrix();
+
+    auto& v{*frame_data_->view_uniform_map.as<view>()};
+    v.camera_position = camera.position();
+    v.light_position = camera.position() +
+        static_cast<soil::perspective_camera const&>(camera).front_direction();
 }
 
 void soil::terrain_renderer::draw(VkImageView target_image,
@@ -377,13 +484,8 @@ void soil::terrain_renderer::draw(VkImageView target_image,
         vkCmdBindVertexBuffers(command_buffer,
             0,
             1,
-            &vertex_index_buffer_.buffer,
+            &vertex_buffer_.buffer,
             &zero_offset);
-
-        vkCmdBindIndexBuffer(command_buffer,
-            vertex_index_buffer_.buffer,
-            index_offset_,
-            VK_INDEX_TYPE_UINT16);
 
         VkViewport const viewport{.x = 0.0f,
             .y = 0.0f,
@@ -402,7 +504,7 @@ void soil::terrain_renderer::draw(VkImageView target_image,
             0,
             std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
 
-        vkCmdDrawIndexed(command_buffer, index_count_, 1, 0, 0, 1);
+        vkCmdDraw(command_buffer, vertex_count_, 1, 0, 0);
     }
 
     frame_data_.cycle();

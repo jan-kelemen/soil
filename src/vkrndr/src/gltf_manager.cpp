@@ -262,7 +262,8 @@ namespace
             vkrndr::vulkan_image const texture_image{
                 renderer->transfer_image(vkrndr::as_bytes(image.image),
                     {cppext::narrow<uint32_t>(image.width),
-                        cppext::narrow<uint32_t>(image.height)})};
+                        cppext::narrow<uint32_t>(image.height)},
+                    VK_FORMAT_R8G8B8A8_SRGB)};
 
             new_model.textures.emplace_back(texture_image);
         }

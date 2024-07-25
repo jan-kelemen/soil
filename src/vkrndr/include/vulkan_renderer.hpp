@@ -64,11 +64,13 @@ namespace vkrndr
         void draw(vulkan_scene* scene);
 
         [[nodiscard]] vulkan_image load_texture(
-            std::filesystem::path const& texture_path);
+            std::filesystem::path const& texture_path,
+            VkFormat format);
 
         [[nodiscard]] vulkan_image transfer_image(
             std::span<std::byte const> image_data,
-            VkExtent2D extent);
+            VkExtent2D extent,
+            VkFormat format);
 
         void transfer_buffer(vulkan_buffer const& source,
             vulkan_buffer const& target);
