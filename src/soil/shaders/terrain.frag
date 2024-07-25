@@ -23,9 +23,9 @@ void main() {
     vec3 lightDirection = normalize(inTangentLightPosition - inTangentFragmentPosition);  
 
     float diff = max(dot(lightDirection, normal), 0.0);
-    vec3 diffuse = diff * color;
+    vec3 diffuse = 0.1 * diff * color;
 
-    float specularStrength = 0.5;
+    float specularStrength = 0.2;
     vec3 viewDirection = normalize(inTangentCameraPosition - inTangentFragmentPosition);
     vec3 reflectDirection = reflect(-lightDirection, normal);
     vec3 halfwayDirection = normalize(lightDirection + viewDirection);

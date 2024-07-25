@@ -34,6 +34,7 @@ namespace
     struct [[nodiscard]] vertex final
     {
         alignas(16) glm::vec3 position;
+        alignas(16) glm::vec3 normal;
         alignas(16) glm::vec2 texture_coordinate;
         alignas(16) glm::vec3 tangent;
     };
@@ -45,6 +46,7 @@ namespace
         glm::mat4 model;
         glm::mat4 view;
         glm::mat4 projection;
+        glm::mat4 normal;
     };
 
     DISABLE_WARNING_PUSH
@@ -77,9 +79,13 @@ namespace
                 .offset = offsetof(vertex, position)},
             VkVertexInputAttributeDescription{.location = 1,
                 .binding = 0,
+                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .offset = offsetof(vertex, normal)},
+            VkVertexInputAttributeDescription{.location = 2,
+                .binding = 0,
                 .format = VK_FORMAT_R32G32_SFLOAT,
                 .offset = offsetof(vertex, texture_coordinate)},
-            VkVertexInputAttributeDescription{.location = 2,
+            VkVertexInputAttributeDescription{.location = 3,
                 .binding = 0,
                 .format = VK_FORMAT_R32G32B32_SFLOAT,
                 .offset = offsetof(vertex, tangent)},
@@ -305,8 +311,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             return vertex{.position = {cppext::as_fp(x),
                               heightmap.value(x, z),
                               cppext::as_fp(z)},
-                .texture_coordinate = {cppext::as_fp(x % 2),
-                    cppext::as_fp(z % 2)}};
+                .texture_coordinate = {cppext::as_fp(x % 2) * 5,
+                    cppext::as_fp(z % 2) * 5}};
         };
         for (size_t z{}; z != heightmap.dimension() - 1; ++z)
         {
@@ -333,6 +339,10 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             glm::vec3 const edge1{point2.position - point1.position};
             glm::vec3 const edge2{point3.position - point1.position};
 
+            // https://stackoverflow.com/a/57812028
+            glm::vec3 const face_normal{
+                glm::normalize(glm::cross(edge1, edge2))};
+
             glm::vec2 const delta_texture1{
                 point2.texture_coordinate - point1.texture_coordinate};
             glm::vec2 const delta_texture2{
@@ -346,8 +356,11 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
                 (edge1 * delta_texture2.y - edge2 * delta_texture1.y) * f};
 
             vertices[i].tangent = tan;
+            vertices[i].normal = face_normal;
             vertices[i + 1].tangent = tan;
+            vertices[i + 1].normal = face_normal;
             vertices[i + 2].tangent = tan;
+            vertices[i + 2].normal = face_normal;
         }
 
         vkrndr::unmap_memory(device_, &staging_map);
@@ -369,6 +382,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
     model_matrix = glm::translate(model_matrix, offset);
     model_matrix = glm::scale(model_matrix, heightmap.scaling());
 
+    glm::mat4 const normal_matrix{glm::transpose(glm::inverse(model_matrix))};
+
     frame_data_ =
         cppext::cycled_buffer<frame_resources>{renderer->image_count(),
             renderer->image_count()};
@@ -384,6 +399,7 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
         data.vertex_uniform_map =
             vkrndr::map_memory(device, data.vertex_uniform.allocation);
         data.vertex_uniform_map.as<transform>()->model = model_matrix;
+        data.vertex_uniform_map.as<transform>()->normal = normal_matrix;
 
         auto const view_buffer_size{sizeof(view)};
         data.view_uniform = create_buffer(device_,
@@ -458,7 +474,7 @@ void soil::terrain_renderer::update(vkrndr::camera const& camera,
     auto& v{*frame_data_->view_uniform_map.as<view>()};
     v.camera_position = camera.position();
     v.light_position = camera.position() +
-        static_cast<soil::perspective_camera const&>(camera).front_direction();
+        static_cast<soil::perspective_camera const&>(camera).up_direction();
 }
 
 void soil::terrain_renderer::draw(VkImageView target_image,
@@ -510,4 +526,4 @@ void soil::terrain_renderer::draw(VkImageView target_image,
     frame_data_.cycle();
 }
 
-void soil::terrain_renderer::draw_imgui() { }
+void soil::terrain_renderer::draw_imgui() { ImGui::ShowMetricsWindow(); }

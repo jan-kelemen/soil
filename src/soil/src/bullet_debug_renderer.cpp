@@ -331,4 +331,4 @@ void soil::bullet_debug_renderer::draw(VkImageView target_image,
     frame_data_.cycle([](auto const&, auto& next) { next.vertex_count = 0; });
 }
 
-void soil::bullet_debug_renderer::draw_imgui() { ImGui::ShowMetricsWindow(); }
+void soil::bullet_debug_renderer::draw_imgui() { }

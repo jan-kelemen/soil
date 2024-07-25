@@ -1,13 +1,16 @@
 #version 460
 
 layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec2 inTexCoord;
-layout(location = 2) in vec3 inTangent;
+layout(location = 1) in vec3 inNormal;
+layout(location = 2) in vec2 inTexCoord;
+layout(location = 3) in vec3 inTangent;
 
 layout(binding = 0) uniform Transform {
     mat4 model;
     mat4 view;
     mat4 projection;
+
+    mat4 normal;
 } transform;
 
 layout(binding = 1) uniform View {
@@ -21,15 +24,13 @@ layout(location = 2) out vec3 outTangentCameraPosition;
 layout(location = 3) out vec3 outTangentFragmentPosition;
 
 void main() {
-    vec3 normal = vec3(0.0, 0.0, 1.0);
-
     vec3 fragmentPosition = (transform.model * vec4(inPosition, 1.0)).xyz;
 
     outTexCoord = inTexCoord;
 
-    mat3 normalMatrix = transpose(inverse(mat3(transform.model)));
+    mat3 normalMatrix = mat3(transform.normal); //transpose(inverse(mat3(transform.model)));
     vec3 T = normalize(normalMatrix * inTangent);
-    vec3 N = normalize(normalMatrix * normal);
+    vec3 N = normalize(normalMatrix * inNormal);
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
     
