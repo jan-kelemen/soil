@@ -151,6 +151,7 @@ vkrndr::vulkan_pipeline_builder::vulkan_pipeline_builder(
     : device_{device}
     , pipeline_layout_{std::move(pipeline_layout)}
     , image_format_{image_format}
+    , dynamic_states_{{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR}}
 {
 }
 
@@ -231,12 +232,10 @@ vkrndr::vulkan_pipeline vkrndr::vulkan_pipeline_builder::build()
     color_blending.pAttachments = &color_blend_attachment;
     std::ranges::fill(color_blending.blendConstants, 0.0f);
 
-    constexpr std::array dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamic_state{};
     dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-    dynamic_state.dynamicStateCount = count_cast(dynamic_states.size()),
-    dynamic_state.pDynamicStates = dynamic_states.data();
+    dynamic_state.dynamicStateCount = count_cast(dynamic_states_.size()),
+    dynamic_state.pDynamicStates = dynamic_states_.data();
 
     VkPipelineRenderingCreateInfo rendering_create_info{};
     rendering_create_info.sType =
@@ -418,6 +417,16 @@ vkrndr::vulkan_pipeline_builder::with_stencil_test(VkFormat depth_format,
 
     depth_stencil_ = depth_stencil;
 
+    return *this;
+}
+
+vkrndr::vulkan_pipeline_builder&
+vkrndr::vulkan_pipeline_builder::with_dynamic_state(VkDynamicState state)
+{
+    if (std::ranges::find(dynamic_states_, state) == std::cend(dynamic_states_))
+    {
+        dynamic_states_.push_back(state);
+    }
     return *this;
 }
 

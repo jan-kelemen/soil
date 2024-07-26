@@ -123,6 +123,8 @@ namespace vkrndr
             VkStencilOpState front,
             VkStencilOpState back);
 
+        vulkan_pipeline_builder& with_dynamic_state(VkDynamicState state);
+
     public: // Operators
         vulkan_pipeline_builder& operator=(
             vulkan_pipeline_builder const&) = delete;
@@ -150,6 +152,7 @@ namespace vkrndr
         std::optional<VkPipelineColorBlendAttachmentState> color_blending_;
         VkFormat depth_format_{VK_FORMAT_UNDEFINED};
         std::optional<VkPipelineDepthStencilStateCreateInfo> depth_stencil_;
+        std::vector<VkDynamicState> dynamic_states_;
     };
 } // namespace vkrndr
 

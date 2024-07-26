@@ -31,6 +31,7 @@ namespace
     DISABLE_WARNING_MISSING_FIELD_INITIALIZERS
     constexpr VkPhysicalDeviceFeatures device_features{
         .sampleRateShading = VK_TRUE,
+        .wideLines = VK_TRUE,
         .samplerAnisotropy = VK_TRUE};
 
     constexpr VkPhysicalDeviceVulkan13Features device_13_features{

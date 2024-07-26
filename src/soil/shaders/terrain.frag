@@ -17,13 +17,10 @@ void main() {
 
     vec3 color = texture(sampler2D(tex, texSampler), inTexCoord).rgb;
 
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * color;
-
     vec3 lightDirection = normalize(inTangentLightPosition - inTangentFragmentPosition);  
 
-    float diff = max(dot(lightDirection, normal), 0.0);
-    vec3 diffuse = 0.1 * diff * color;
+    float diff = max(dot(lightDirection, normal), 0.2);
+    vec3 diffuse = diff * color;
 
     float specularStrength = 0.2;
     vec3 viewDirection = normalize(inTangentCameraPosition - inTangentFragmentPosition);
@@ -32,5 +29,5 @@ void main() {
     float spec = pow(max(dot(normal, halfwayDirection), 0.0), 32.0);
     vec3 specular = specularStrength * spec * vec3(0.2);  
 
-    outColor = vec4(ambient + diffuse + specular, 1.0);
+    outColor = vec4(diffuse + specular, 1.0);
 }

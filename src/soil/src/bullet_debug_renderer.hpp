@@ -10,6 +10,7 @@
 
 #include <LinearMath/btIDebugDraw.h>
 #include <LinearMath/btScalar.h>
+#include <LinearMath/btVector3.h>
 
 #include <vulkan/vulkan_core.h>
 
@@ -44,6 +45,9 @@ namespace soil
 
     public:
         ~bullet_debug_renderer() override;
+
+    public:
+        void set_camera_position(glm::vec3 const& position);
 
     public: // btIDebugDraw overrides
         void drawLine(btVector3 const& from,
@@ -105,6 +109,10 @@ namespace soil
 
         VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> line_pipeline_;
+
+        btVector3 camera_position_;
+        bool cull_geometry_{true};
+        float cull_distance_{30.0f};
 
         cppext::cycled_buffer<frame_resources> frame_data_;
     };

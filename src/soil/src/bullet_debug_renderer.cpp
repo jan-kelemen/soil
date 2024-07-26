@@ -38,7 +38,7 @@
 
 namespace
 {
-    constexpr uint32_t max_vertex_count{100000};
+    constexpr uint32_t max_vertex_count{1000};
 
     DISABLE_WARNING_PUSH
     DISABLE_WARNING_STRUCTURE_WAS_PADDED_DUE_TO_ALIGNMENT_SPECIFIER
@@ -158,6 +158,7 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
                 "bullet_debug_line.frag.spv",
                 "main")
             .with_primitive_topology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST)
+            .with_dynamic_state(VK_DYNAMIC_STATE_LINE_WIDTH)
             .with_rasterization_samples(device_->max_msaa_samples)
             .add_vertex_input(binding_description(), attribute_descriptions())
             .with_depth_test(depth_buffer_->format)
@@ -224,18 +225,38 @@ soil::bullet_debug_renderer::~bullet_debug_renderer()
         nullptr);
 }
 
+void soil::bullet_debug_renderer::set_camera_position(glm::vec3 const& position)
+{
+    camera_position_ = to_bullet(position);
+}
+
 void soil::bullet_debug_renderer::drawLine(btVector3 const& from,
     btVector3 const& to,
     btVector3 const& color)
 {
+    if (cull_geometry_)
+    {
+        if (!(from.distance(camera_position_) <= cull_distance_ ||
+                to.distance(camera_position_) <= cull_distance_))
+        {
+            return;
+        }
+    }
+
     if (frame_data_->vertex_count < max_vertex_count)
     {
         auto* const vertices{frame_data_->vertex_map.as<vertex>()};
 
+        // Offset the vertices by a small amount to resolve Z-fighting with the
+        // terrain
+        static constexpr glm::vec3 vertex_offset{0.0f, 0.01f, 0.0f};
+
         vertices[frame_data_->vertex_count] =
-            vertex{.position = from_bullet(from), .color = from_bullet(color)};
+            vertex{.position = from_bullet(from) + vertex_offset,
+                .color = from_bullet(color)};
         vertices[frame_data_->vertex_count + 1] =
-            vertex{.position = from_bullet(to), .color = from_bullet(color)};
+            vertex{.position = from_bullet(to) + vertex_offset,
+                .color = from_bullet(color)};
 
         frame_data_->vertex_count += 2;
     }
@@ -325,10 +346,21 @@ void soil::bullet_debug_renderer::draw(VkImageView target_image,
             0,
             std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
 
+        vkCmdSetLineWidth(command_buffer, 4.0f);
+
         vkCmdDraw(command_buffer, frame_data_->vertex_count, 1, 0, 0);
     }
 
     frame_data_.cycle([](auto const&, auto& next) { next.vertex_count = 0; });
 }
 
-void soil::bullet_debug_renderer::draw_imgui() { }
+void soil::bullet_debug_renderer::draw_imgui()
+{
+    ImGui::Begin("Bullet Physics");
+    ImGui::Checkbox("Cull geometry", &cull_geometry_);
+    if (cull_geometry_)
+    {
+        ImGui::SliderFloat("Cull distance", &cull_distance_, 0.0f, 50.0f);
+    }
+    ImGui::End();
+}

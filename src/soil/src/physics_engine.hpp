@@ -35,7 +35,7 @@ namespace soil
     public:
         void fixed_update(float delta_time);
 
-        void update();
+        void update(glm::vec3 const& camera_position);
 
         [[nodiscard]] vkrndr::vulkan_scene* render_scene();
 

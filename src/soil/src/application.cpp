@@ -76,7 +76,7 @@ void soil::application::update(float const delta_time)
 {
     camera_controller_.update(delta_time);
 
-    physics_.update();
+    physics_.update(camera_.position());
 
     update(camera_, delta_time);
 }

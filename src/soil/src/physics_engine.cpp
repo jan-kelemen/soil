@@ -37,7 +37,7 @@ public:
 public:
     void fixed_update(float delta_time);
 
-    void update();
+    void update(glm::vec3 const& camera_position);
 
     [[nodiscard]] vkrndr::vulkan_scene* render_scene();
 
@@ -122,7 +122,14 @@ void soil::physics_engine::impl::set_gravity(glm::vec3 const& gravity)
     world_.setGravity(to_bullet(gravity));
 }
 
-void soil::physics_engine::impl::update() { world_.debugDrawWorld(); }
+void soil::physics_engine::impl::update(glm::vec3 const& camera_position)
+{
+    if (debug_renderer_)
+    {
+        debug_renderer_->set_camera_position(camera_position);
+    }
+    world_.debugDrawWorld();
+}
 
 vkrndr::vulkan_scene* soil::physics_engine::impl::render_scene()
 {
@@ -202,7 +209,10 @@ void soil::physics_engine::fixed_update(float const delta_time)
     impl_->fixed_update(delta_time);
 }
 
-void soil::physics_engine::update() { impl_->update(); }
+void soil::physics_engine::update(glm::vec3 const& camera_position)
+{
+    impl_->update(camera_position);
+}
 
 vkrndr::vulkan_scene* soil::physics_engine::render_scene()
 {
