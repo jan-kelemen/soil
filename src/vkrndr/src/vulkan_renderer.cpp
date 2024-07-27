@@ -245,6 +245,9 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::load_texture(
         STBI_rgb_alpha)};
 
     auto const image_size{static_cast<VkDeviceSize>(width * height * 4)};
+    uint32_t const mip_levels{
+        static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) +
+        1};
 
     if (!pixels)
     {
@@ -257,7 +260,8 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::load_texture(
     // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
     vulkan_image rv{transfer_image(image_bytes,
         {cppext::narrow<uint32_t>(width), cppext::narrow<uint32_t>(height)},
-        format)};
+        format,
+        mip_levels)};
 
     stbi_image_free(pixels);
 
@@ -267,7 +271,8 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::load_texture(
 vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
     std::span<std::byte const> image_data,
     VkExtent2D const extent,
-    VkFormat const format)
+    VkFormat const format,
+    uint32_t const mip_levels)
 {
     vulkan_buffer staging_buffer{create_buffer(device_,
         image_data.size(),
@@ -281,11 +286,12 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
 
     vulkan_image image{create_image_and_view(device_,
         extent,
-        1,
+        mip_levels,
         VK_SAMPLE_COUNT_1_BIT,
         format,
         VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+            VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT)};
 
@@ -297,12 +303,26 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
         1,
         std::span{&present_queue_buffer, 1});
 
-    wait_for_transfer_write(image.image, present_queue_buffer);
+    wait_for_transfer_write(image.image, present_queue_buffer, mip_levels);
     copy_buffer_to_image(present_queue_buffer,
         staging_buffer.buffer,
         image.image,
         extent);
-    wait_for_transfer_write_completed(image.image, present_queue_buffer);
+    if (mip_levels == 1)
+    {
+        wait_for_transfer_write_completed(image.image,
+            present_queue_buffer,
+            mip_levels);
+    }
+    else
+    {
+        generate_mipmaps(device_,
+            image.image,
+            present_queue_buffer,
+            format,
+            extent,
+            mip_levels);
+    }
 
     end_single_time_commands(device_,
         queue->queue,
@@ -365,9 +385,8 @@ vkrndr::vulkan_font vkrndr::vulkan_renderer::load_font(
         1,
         VK_SAMPLE_COUNT_1_BIT,
         VK_FORMAT_R8_UNORM,
-        VK_IMAGE_TILING_LINEAR,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-            VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT)};
 
@@ -379,14 +398,14 @@ vkrndr::vulkan_font vkrndr::vulkan_renderer::load_font(
         1,
         std::span{&present_queue_buffer, 1});
 
-    wait_for_transfer_write(texture.image, present_queue_buffer);
+    wait_for_transfer_write(texture.image, present_queue_buffer, 1);
 
     copy_buffer_to_image(present_queue_buffer,
         staging_buffer.buffer,
         texture.image,
         bitmap_extent);
 
-    wait_for_transfer_write_completed(texture.image, present_queue_buffer);
+    wait_for_transfer_write_completed(texture.image, present_queue_buffer, 1);
 
     end_single_time_commands(device_,
         queue->queue,

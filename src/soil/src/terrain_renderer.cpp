@@ -96,7 +96,7 @@ namespace
 
     [[nodiscard]] VkSampler create_texture_sampler(
         vkrndr::vulkan_device const* const device,
-        uint32_t const mip_levels = 1)
+        uint32_t const mip_levels)
     {
         VkPhysicalDeviceProperties properties; // NOLINT
         vkGetPhysicalDeviceProperties(device->physical, &properties);
@@ -117,7 +117,7 @@ namespace
         sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         sampler_info.mipLodBias = 0.0f;
         sampler_info.minLod = 0.0f;
-        sampler_info.maxLod = static_cast<float>(mip_levels);
+        sampler_info.maxLod = cppext::as_fp(mip_levels);
 
         VkSampler rv; // NOLINT
         vkrndr::check_result(
@@ -264,7 +264,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
     , texture_normal_{renderer->load_texture(
           "coast_sand_rocks_02_nor_gl_1k.jpg",
           VK_FORMAT_R8G8B8A8_UNORM)}
-    , texture_sampler_{create_texture_sampler(device)}
+    , texture_sampler_{create_texture_sampler(device,
+          std::min(texture_.mip_levels, texture_normal_.mip_levels))}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
     , vertex_count_{cppext::narrow<uint32_t>(
           (heightmap.dimension() - 1) * (heightmap.dimension() - 1) * 6)}

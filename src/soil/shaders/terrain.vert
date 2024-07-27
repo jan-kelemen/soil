@@ -24,11 +24,11 @@ layout(location = 2) out vec3 outTangentCameraPosition;
 layout(location = 3) out vec3 outTangentFragmentPosition;
 
 void main() {
-    vec3 fragmentPosition = (transform.model * vec4(inPosition, 1.0)).xyz;
+    vec4 worldPosition = transform.model * vec4(inPosition, 1.0);
 
     outTexCoord = inTexCoord;
 
-    mat3 normalMatrix = mat3(transform.normal); //transpose(inverse(mat3(transform.model)));
+    mat3 normalMatrix = mat3(transform.normal);
     vec3 T = normalize(normalMatrix * inTangent);
     vec3 N = normalize(normalMatrix * inNormal);
     T = normalize(T - dot(T, N) * N);
@@ -37,8 +37,8 @@ void main() {
     mat3 TBN = transpose(mat3(T, B, N));    
     outTangentLightPosition = TBN * view.lightPosition;
     outTangentCameraPosition  = TBN * view.cameraPosition;
-    outTangentFragmentPosition  = TBN * fragmentPosition;
+    outTangentFragmentPosition  = TBN * worldPosition.xyz;
 
-    gl_Position = transform.projection * transform.view * transform.model * vec4(inPosition, 1.0);
+    gl_Position = transform.projection * transform.view * worldPosition;
 }
 

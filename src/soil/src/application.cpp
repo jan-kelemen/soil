@@ -48,6 +48,8 @@ soil::application::application(bool debug)
     , camera_controller_{&camera_, &mouse_}
     , mouse_controller_{&mouse_, &camera_, &physics_}
 {
+    vulkan_renderer()->imgui_layer(true);
+
     fixed_update_interval(1.0f / 60.0f);
 
     camera_.resize({512, 512});

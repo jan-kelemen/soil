@@ -20,6 +20,7 @@ namespace vkrndr
         VmaAllocation allocation{VK_NULL_HANDLE};
         VkImageView view{VK_NULL_HANDLE};
         VkFormat format{};
+        uint32_t mip_levels{1};
     };
 
     void destroy(vulkan_device const* device, vulkan_image* image);

@@ -70,7 +70,8 @@ namespace vkrndr
         [[nodiscard]] vulkan_image transfer_image(
             std::span<std::byte const> image_data,
             VkExtent2D extent,
-            VkFormat format);
+            VkFormat format,
+            uint32_t mip_levels);
 
         void transfer_buffer(vulkan_buffer const& source,
             vulkan_buffer const& target);

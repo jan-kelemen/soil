@@ -4,6 +4,7 @@
 #include <vulkan_utility.hpp>
 
 #include <cassert>
+#include <stdexcept>
 
 namespace
 {
@@ -14,7 +15,8 @@ namespace
         VkAccessFlags2 const src_access_mask,
         VkImageLayout const new_layout,
         VkPipelineStageFlags2 const dst_stage_mask,
-        VkAccessFlags2 const dst_access_mask)
+        VkAccessFlags2 const dst_access_mask,
+        uint32_t const mip_levels)
     {
         VkImageMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -28,7 +30,7 @@ namespace
         barrier.subresourceRange = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .baseMipLevel = 0,
-            .levelCount = 1,
+            .levelCount = mip_levels,
             .baseArrayLayer = 0,
             .layerCount = 1,
         };
@@ -152,7 +154,8 @@ void vkrndr::wait_for_color_attachment_read(VkImage const image,
         VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT);
+        VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+        1);
 }
 
 void vkrndr::wait_for_color_attachment_write(VkImage const image,
@@ -169,7 +172,8 @@ void vkrndr::wait_for_color_attachment_write(VkImage const image,
         VK_ACCESS_2_NONE,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        1);
 }
 
 void vkrndr::transition_to_present_layout(VkImage const image,
@@ -182,11 +186,13 @@ void vkrndr::transition_to_present_layout(VkImage const image,
         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
         VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
-        VK_ACCESS_2_NONE);
+        VK_ACCESS_2_NONE,
+        1);
 }
 
 void vkrndr::wait_for_transfer_write(VkImage image,
-    VkCommandBuffer command_buffer)
+    VkCommandBuffer command_buffer,
+    uint32_t const mip_levels)
 {
     transition_image(image,
         command_buffer,
@@ -195,11 +201,13 @@ void vkrndr::wait_for_transfer_write(VkImage image,
         VK_ACCESS_2_NONE,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT,
-        VK_ACCESS_2_TRANSFER_WRITE_BIT);
+        VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        mip_levels);
 }
 
 void vkrndr::wait_for_transfer_write_completed(VkImage image,
-    VkCommandBuffer command_buffer)
+    VkCommandBuffer command_buffer,
+    uint32_t const mip_levels)
 {
     transition_image(image,
         command_buffer,
@@ -208,5 +216,99 @@ void vkrndr::wait_for_transfer_write_completed(VkImage image,
         VK_ACCESS_2_TRANSFER_WRITE_BIT,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
-        VK_ACCESS_2_NONE);
+        VK_ACCESS_2_NONE,
+        mip_levels);
+}
+
+void vkrndr::generate_mipmaps(vulkan_device const* const device,
+    VkImage image,
+    VkCommandBuffer command_buffer,
+    VkFormat const format,
+    VkExtent2D const extent,
+    uint32_t const mip_levels)
+{
+    VkFormatProperties properties;
+    vkGetPhysicalDeviceFormatProperties(device->physical, format, &properties);
+    if (!(properties.optimalTilingFeatures &
+            VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+    {
+        throw std::runtime_error{
+            "texture image format does not support linear blitting!"};
+    }
+
+    VkImageMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    barrier.image = image;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.levelCount = 1;
+
+    VkDependencyInfo dependency{};
+    dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency.imageMemoryBarrierCount = 1;
+    dependency.pImageMemoryBarriers = &barrier;
+
+    auto mip_width{cppext::narrow<int32_t>(extent.width)};
+    auto mip_height{cppext::narrow<int32_t>(extent.height)};
+    for (uint32_t i{1}; i != mip_levels; ++i)
+    {
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.subresourceRange.baseMipLevel = i - 1;
+
+        vkCmdPipelineBarrier2(command_buffer, &dependency);
+
+        VkImageBlit blit{};
+        blit.srcOffsets[0] = {0, 0, 0};
+        blit.srcOffsets[1] = {mip_width, mip_height, 1};
+        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.srcSubresource.mipLevel = i - 1;
+        blit.srcSubresource.baseArrayLayer = 0;
+        blit.srcSubresource.layerCount = 1;
+        blit.dstOffsets[0] = {0, 0, 0};
+        blit.dstOffsets[1] = {mip_width > 1 ? mip_width / 2 : 1,
+            mip_height > 1 ? mip_height / 2 : 1,
+            1};
+        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.dstSubresource.mipLevel = i;
+        blit.dstSubresource.baseArrayLayer = 0;
+        blit.dstSubresource.layerCount = 1;
+
+        vkCmdBlitImage(command_buffer,
+            image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &blit,
+            VK_FILTER_LINEAR);
+
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier2(command_buffer, &dependency);
+
+        mip_width = std::max(1, mip_width / 2);
+        mip_height = std::max(1, mip_height / 2);
+    }
+
+    barrier.subresourceRange.baseMipLevel = mip_levels - 1;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier2(command_buffer, &dependency);
 }

@@ -259,11 +259,17 @@ namespace
             auto const source{size_cast(tex.source)};
             tinygltf::Image const& image{model.images[source]};
 
+            uint32_t const mip_levels{
+                static_cast<uint32_t>(std::floor(
+                    std::log2(std::max(image.width, image.height)))) +
+                1};
+
             vkrndr::vulkan_image const texture_image{
                 renderer->transfer_image(vkrndr::as_bytes(image.image),
                     {cppext::narrow<uint32_t>(image.width),
                         cppext::narrow<uint32_t>(image.height)},
-                    VK_FORMAT_R8G8B8A8_SRGB)};
+                    VK_FORMAT_R8G8B8A8_SRGB,
+                    mip_levels)};
 
             new_model.textures.emplace_back(texture_image);
         }

@@ -48,10 +48,21 @@ namespace vkrndr
     void transition_to_present_layout(VkImage image,
         VkCommandBuffer command_buffer);
 
-    void wait_for_transfer_write(VkImage image, VkCommandBuffer command_buffer);
+    void wait_for_transfer_write(VkImage image,
+        VkCommandBuffer command_buffer,
+        uint32_t mip_levels);
 
     void wait_for_transfer_write_completed(VkImage image,
-        VkCommandBuffer command_buffer);
+        VkCommandBuffer command_buffer,
+        uint32_t mip_levels);
+
+    void generate_mipmaps(vulkan_device const* device,
+        VkImage image,
+        VkCommandBuffer command_buffer,
+        VkFormat format,
+        VkExtent2D extent,
+        uint32_t mip_levels);
+
 } // namespace vkrndr
 
 #endif // !VKRNDR_VULKAN_COMMANDS_INCLUDED
