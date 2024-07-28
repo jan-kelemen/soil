@@ -1,5 +1,6 @@
 #include <application.hpp>
 
+#include <bullet_debug_renderer.hpp>
 #include <free_camera_controller.hpp>
 #include <heightmap.hpp>
 #include <mouse_controller.hpp>
@@ -7,13 +8,15 @@
 #include <physics_engine.hpp>
 #include <terrain_renderer.hpp>
 
+#include <cppext_numeric.hpp>
+
 #include <niku_application.hpp>
 
+#include <vkrndr_scene.hpp> // IWYU pragma: keep
 #include <vulkan_depth_buffer.hpp>
 #include <vulkan_device.hpp>
 #include <vulkan_image.hpp>
 #include <vulkan_renderer.hpp>
-#include <vulkan_scene.hpp>
 
 #include <BulletCollision/CollisionShapes/btBoxShape.h>
 #include <BulletCollision/CollisionShapes/btCollisionShape.h>
@@ -30,7 +33,7 @@
 // IWYU pragma: no_include <BulletCollision/CollisionShapes/btConcaveShape.h>
 // IWYU pragma: no_include <glm/detail/qualifier.hpp>
 
-soil::application::application(bool debug)
+soil::application::application(bool const debug)
     : niku::application(niku::startup_params{
           .init_subsystems = {.video = true, .audio = false, .debug = debug},
           .title = "soil",
@@ -43,8 +46,6 @@ soil::application::application(bool debug)
     , camera_controller_{&camera_, &mouse_}
     , mouse_controller_{&mouse_, &camera_, &physics_}
 {
-    vulkan_renderer()->imgui_layer(true);
-
     fixed_update_interval(1.0f / 60.0f);
 
     camera_.resize({512, 512});
@@ -73,12 +74,13 @@ void soil::application::update(float const delta_time)
 {
     camera_controller_.update(delta_time);
 
-    physics_.update(camera_.position());
+    terrain_renderer_->update(camera_, delta_time);
 
-    update(camera_, delta_time);
+    physics_.update(camera_.position());
+    physics_.debug_renderer()->update(camera_, delta_time);
 }
 
-vkrndr::vulkan_scene* soil::application::render_scene() { return this; }
+vkrndr::scene* soil::application::render_scene() { return this; }
 
 void soil::application::on_startup()
 {
@@ -152,23 +154,27 @@ void soil::application::resize(VkExtent2D extent)
         vkrndr::create_depth_buffer(this->vulkan_device(), extent, false);
 }
 
-void soil::application::update(vkrndr::camera const& camera, float delta_time)
-{
-    physics_.render_scene()->update(camera, delta_time);
-
-    terrain_renderer_->update(camera, delta_time);
-}
-
 void soil::application::draw(VkImageView target_image,
     VkCommandBuffer command_buffer,
     VkExtent2D extent)
 {
-    terrain_renderer_->draw(target_image, command_buffer, extent);
-    physics_.render_scene()->draw(target_image, command_buffer, extent);
+    VkViewport const viewport{.x = 0.0f,
+        .y = 0.0f,
+        .width = cppext::as_fp(extent.width),
+        .height = cppext::as_fp(extent.height),
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f};
+    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+
+    VkRect2D const scissor{{0, 0}, extent};
+    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+
+    terrain_renderer_->draw(target_image, command_buffer, scissor);
+    physics_.debug_renderer()->draw(target_image, command_buffer, scissor);
 }
 
 void soil::application::draw_imgui()
 {
     terrain_renderer_->draw_imgui();
-    physics_.render_scene()->draw_imgui();
+    physics_.debug_renderer()->draw_imgui();
 }

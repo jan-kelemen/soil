@@ -11,7 +11,7 @@ namespace vkrndr
 {
     struct vulkan_device;
     class vulkan_renderer;
-    class vulkan_scene;
+    class scene;
 } // namespace vkrndr
 
 namespace niku
@@ -78,7 +78,7 @@ namespace niku
 
         virtual void update([[maybe_unused]] float const delta_time) { }
 
-        [[nodiscard]] virtual vkrndr::vulkan_scene* render_scene() = 0;
+        [[nodiscard]] virtual vkrndr::scene* render_scene() = 0;
 
         virtual void end_frame() { }
 

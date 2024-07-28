@@ -5,7 +5,6 @@
 
 #include <vulkan_buffer.hpp>
 #include <vulkan_memory.hpp>
-#include <vulkan_scene.hpp>
 
 #include <LinearMath/btIDebugDraw.h>
 #include <LinearMath/btScalar.h>
@@ -29,9 +28,7 @@ namespace vkrndr
 
 namespace soil
 {
-    class [[nodiscard]] bullet_debug_renderer final
-        : public btIDebugDraw
-        , public vkrndr::vulkan_scene
+    class [[nodiscard]] bullet_debug_renderer final : public btIDebugDraw
     {
     public:
         bullet_debug_renderer(vkrndr::vulkan_device* device,
@@ -48,6 +45,14 @@ namespace soil
 
     public:
         void set_camera_position(glm::vec3 const& position);
+
+        void update(vkrndr::camera const& camera, float delta_time);
+
+        void draw(VkImageView target_image,
+            VkCommandBuffer command_buffer,
+            VkRect2D render_area);
+
+        void draw_imgui();
 
     public: // btIDebugDraw overrides
         void drawLine(btVector3 const& from,
@@ -68,17 +73,6 @@ namespace soil
         void setDebugMode(int debugMode) override;
 
         [[nodiscard]] int getDebugMode() const override;
-
-    public: // vulkan_scene overrides
-        void resize(VkExtent2D extent) override;
-
-        void update(vkrndr::camera const& camera, float delta_time) override;
-
-        void draw(VkImageView target_image,
-            VkCommandBuffer command_buffer,
-            VkExtent2D extent) override;
-
-        void draw_imgui() override;
 
     public:
         bullet_debug_renderer& operator=(bullet_debug_renderer const&) = delete;

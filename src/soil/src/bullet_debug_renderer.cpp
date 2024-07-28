@@ -3,7 +3,6 @@
 #include <bullet_adapter.hpp> // IWYU pragma: keep
 
 #include <cppext_cycled_buffer.hpp>
-#include <cppext_numeric.hpp>
 #include <cppext_pragma_warning.hpp>
 
 #include <vkrndr_camera.hpp>
@@ -143,8 +142,6 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
     , depth_buffer_{depth_buffer}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
 {
-    resize(renderer_->extent());
-
     line_pipeline_ = std::make_unique<vkrndr::vulkan_pipeline>(
         vkrndr::vulkan_pipeline_builder{device_,
             vkrndr::vulkan_pipeline_layout_builder{device_}
@@ -292,11 +289,6 @@ void soil::bullet_debug_renderer::setDebugMode(int debugMode)
 
 int soil::bullet_debug_renderer::getDebugMode() const { return debug_mode_; }
 
-void soil::bullet_debug_renderer::resize(
-    [[maybe_unused]] VkExtent2D const extent)
-{
-}
-
 void soil::bullet_debug_renderer::update(vkrndr::camera const& camera,
     [[maybe_unused]] float const delta_time)
 {
@@ -306,7 +298,7 @@ void soil::bullet_debug_renderer::update(vkrndr::camera const& camera,
 
 void soil::bullet_debug_renderer::draw(VkImageView target_image,
     VkCommandBuffer command_buffer,
-    VkExtent2D const extent)
+    VkRect2D const render_area)
 {
     vkrndr::render_pass render_pass;
 
@@ -321,7 +313,7 @@ void soil::bullet_debug_renderer::draw(VkImageView target_image,
 
     {
         // cppcheck-suppress unreadVariable
-        auto guard{render_pass.begin(command_buffer, {{0, 0}, extent})};
+        auto const guard{render_pass.begin(command_buffer, render_area)};
 
         VkDeviceSize const zero_offset{0};
         vkCmdBindVertexBuffers(command_buffer,
@@ -329,17 +321,6 @@ void soil::bullet_debug_renderer::draw(VkImageView target_image,
             1,
             &frame_data_->vertex_buffer.buffer,
             &zero_offset);
-
-        VkViewport const viewport{.x = 0.0f,
-            .y = 0.0f,
-            .width = cppext::as_fp(extent.width),
-            .height = cppext::as_fp(extent.height),
-            .minDepth = 0.0f,
-            .maxDepth = 1.0f};
-        vkCmdSetViewport(command_buffer, 0, 1, &viewport);
-
-        VkRect2D const scissor{{0, 0}, extent};
-        vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
         vkrndr::bind_pipeline(command_buffer,
             *line_pipeline_,

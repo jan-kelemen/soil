@@ -9,19 +9,14 @@
 #include <niku_application.hpp>
 #include <niku_mouse.hpp>
 
+#include <vkrndr_scene.hpp>
 #include <vulkan_image.hpp>
-#include <vulkan_scene.hpp>
 
 #include <SDL2/SDL_events.h>
 
 #include <vulkan/vulkan_core.h>
 
 #include <memory>
-
-namespace vkrndr
-{
-    class camera;
-} // namespace vkrndr
 
 namespace soil
 {
@@ -33,7 +28,7 @@ namespace soil
 {
     class [[nodiscard]] application final
         : public niku::application
-        , private vkrndr::vulkan_scene
+        , private vkrndr::scene
     {
     public:
         explicit application(bool debug);
@@ -59,7 +54,7 @@ namespace soil
 
         void update(float delta_time) override;
 
-        [[nodiscard]] vkrndr::vulkan_scene* render_scene() override;
+        [[nodiscard]] vkrndr::scene* render_scene() override;
 
         void on_startup() override;
 
@@ -67,8 +62,6 @@ namespace soil
 
     public: // vulkan_scene overrides
         void resize(VkExtent2D extent) override;
-
-        void update(vkrndr::camera const& camera, float delta_time) override;
 
         void draw(VkImageView target_image,
             VkCommandBuffer command_buffer,

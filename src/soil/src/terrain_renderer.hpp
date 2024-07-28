@@ -6,7 +6,6 @@
 #include <vulkan_buffer.hpp>
 #include <vulkan_image.hpp>
 #include <vulkan_memory.hpp>
-#include <vulkan_scene.hpp>
 
 #include <vulkan/vulkan_core.h>
 
@@ -18,17 +17,17 @@ namespace vkrndr
     struct vulkan_device;
     struct vulkan_pipeline;
     class vulkan_renderer;
-    class camera;
 } // namespace vkrndr
 
 namespace soil
 {
     class heightmap;
+    class perspective_camera;
 } // namespace soil
 
 namespace soil
 {
-    class [[nodiscard]] terrain_renderer : public vkrndr::vulkan_scene
+    class [[nodiscard]] terrain_renderer
     {
     public:
         terrain_renderer(vkrndr::vulkan_device* device,
@@ -42,17 +41,16 @@ namespace soil
         terrain_renderer(terrain_renderer&&) noexcept = delete;
 
     public:
-        ~terrain_renderer() override;
+        ~terrain_renderer();
 
-        void resize(VkExtent2D extent) override;
-
-        void update(vkrndr::camera const& camera, float delta_time) override;
+    public:
+        void update(soil::perspective_camera const& camera, float delta_time);
 
         void draw(VkImageView target_image,
             VkCommandBuffer command_buffer,
-            VkExtent2D extent) override;
+            VkRect2D render_area);
 
-        void draw_imgui() override;
+        void draw_imgui();
 
     public:
         terrain_renderer& operator=(terrain_renderer const&) = delete;

@@ -166,7 +166,7 @@ void niku::application::run()
 
         update(delta);
 
-        if (vkrndr::vulkan_scene* const scene{render_scene()};
+        if (vkrndr::scene* const scene{render_scene()};
             impl_->renderer->begin_frame(scene))
         {
             impl_->renderer->draw(scene);
@@ -189,7 +189,7 @@ void niku::application::fixed_update_interval(float const delta_time)
     }
     else
     {
-        impl_->fixed_update_interval = {};
+        impl_->fixed_update_interval.reset();
     }
 }
 

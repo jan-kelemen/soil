@@ -6,6 +6,7 @@ target_sources(vkrndr
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gltf_manager.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vkrndr_camera.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vkrndr_render_pass.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/vkrndr_scene.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_buffer.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_commands.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_context.hpp
@@ -18,7 +19,6 @@ target_sources(vkrndr
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_pipeline.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_queue.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_renderer.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_scene.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_synchronization.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_utility.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/vulkan_window.hpp

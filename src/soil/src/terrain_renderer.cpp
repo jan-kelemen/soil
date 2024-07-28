@@ -7,7 +7,6 @@
 #include <cppext_numeric.hpp>
 #include <cppext_pragma_warning.hpp>
 
-#include <vkrndr_camera.hpp>
 #include <vkrndr_render_pass.hpp>
 #include <vulkan_buffer.hpp>
 #include <vulkan_descriptors.hpp>
@@ -280,8 +279,6 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
     , vertex_count_{cppext::narrow<uint32_t>(
           (heightmap.dimension() - 1) * (heightmap.dimension() - 1) * 6)}
 {
-    resize(renderer_->extent());
-
     pipeline_ = std::make_unique<vkrndr::vulkan_pipeline>(
         vkrndr::vulkan_pipeline_builder{device_,
             vkrndr::vulkan_pipeline_layout_builder{device_}
@@ -481,10 +478,8 @@ soil::terrain_renderer::~terrain_renderer()
     vkDestroySampler(device_->logical, texture_sampler_, nullptr);
 }
 
-void soil::terrain_renderer::resize([[maybe_unused]] VkExtent2D extent) { }
-
-void soil::terrain_renderer::update(vkrndr::camera const& camera,
-    [[maybe_unused]] float delta_time)
+void soil::terrain_renderer::update(soil::perspective_camera const& camera,
+    [[maybe_unused]] float const delta_time)
 {
     auto& uniform{*frame_data_->vertex_uniform_map.as<transform>()};
     uniform.view = camera.view_matrix();
@@ -492,15 +487,12 @@ void soil::terrain_renderer::update(vkrndr::camera const& camera,
 
     auto& v{*frame_data_->view_uniform_map.as<view>()};
     v.camera_position = camera.position();
-    // NOLINTBEGIN(cppcoreguidelines-pro-type-static-cast-downcast)
-    v.light_position = camera.position() +
-        static_cast<soil::perspective_camera const&>(camera).up_direction();
-    // NOLINTEND(cppcoreguidelines-pro-type-static-cast-downcast)
+    v.light_position = camera.position() + camera.up_direction();
 }
 
 void soil::terrain_renderer::draw(VkImageView target_image,
     VkCommandBuffer command_buffer,
-    VkExtent2D extent)
+    VkRect2D const render_area)
 {
     vkrndr::render_pass render_pass;
 
@@ -516,7 +508,7 @@ void soil::terrain_renderer::draw(VkImageView target_image,
 
     {
         // cppcheck-suppress unreadVariable
-        auto guard{render_pass.begin(command_buffer, {{0, 0}, extent})};
+        auto const guard{render_pass.begin(command_buffer, render_area)};
 
         VkDeviceSize const zero_offset{0};
         vkCmdBindVertexBuffers(command_buffer,
@@ -524,17 +516,6 @@ void soil::terrain_renderer::draw(VkImageView target_image,
             1,
             &vertex_buffer_.buffer,
             &zero_offset);
-
-        VkViewport const viewport{.x = 0.0f,
-            .y = 0.0f,
-            .width = cppext::as_fp(extent.width),
-            .height = cppext::as_fp(extent.height),
-            .minDepth = 0.0f,
-            .maxDepth = 1.0f};
-        vkCmdSetViewport(command_buffer, 0, 1, &viewport);
-
-        VkRect2D const scissor{{0, 0}, extent};
-        vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
         vkrndr::bind_pipeline(command_buffer,
             *pipeline_,

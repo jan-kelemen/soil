@@ -23,7 +23,7 @@ namespace vkrndr
     struct vulkan_buffer;
     struct vulkan_context;
     struct vulkan_device;
-    class vulkan_scene;
+    class scene;
     class vulkan_swap_chain;
     class vulkan_window;
     struct vulkan_queue;
@@ -59,11 +59,11 @@ namespace vkrndr
 
         void imgui_layer(bool state);
 
-        [[nodiscard]] bool begin_frame(vulkan_scene* scene);
+        [[nodiscard]] bool begin_frame(scene* scene);
 
         void end_frame();
 
-        void draw(vulkan_scene* scene);
+        void draw(scene* scene);
 
         [[nodiscard]] vulkan_image load_texture(
             std::filesystem::path const& texture_path,

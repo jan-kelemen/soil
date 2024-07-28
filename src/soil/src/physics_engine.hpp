@@ -13,10 +13,14 @@ class btRigidBody;
 namespace vkrndr
 {
     struct vulkan_image;
-    class vulkan_scene;
     struct vulkan_device;
     class vulkan_renderer;
 } // namespace vkrndr
+
+namespace soil
+{
+    class bullet_debug_renderer;
+} // namespace soil
 
 namespace soil
 {
@@ -37,7 +41,7 @@ namespace soil
 
         void update(glm::vec3 const& camera_position);
 
-        [[nodiscard]] vkrndr::vulkan_scene* render_scene();
+        [[nodiscard]] bullet_debug_renderer* debug_renderer();
 
         void attach_renderer(vkrndr::vulkan_device* device,
             vkrndr::vulkan_renderer* renderer,

@@ -39,7 +39,7 @@ public:
 
     void update(glm::vec3 const& camera_position);
 
-    [[nodiscard]] vkrndr::vulkan_scene* render_scene();
+    [[nodiscard]] bullet_debug_renderer* debug_renderer();
 
     void attach_renderer(vkrndr::vulkan_device* device,
         vkrndr::vulkan_renderer* renderer,
@@ -127,11 +127,11 @@ void soil::physics_engine::impl::update(glm::vec3 const& camera_position)
     if (debug_renderer_)
     {
         debug_renderer_->set_camera_position(camera_position);
+        world_.debugDrawWorld();
     }
-    world_.debugDrawWorld();
 }
 
-vkrndr::vulkan_scene* soil::physics_engine::impl::render_scene()
+soil::bullet_debug_renderer* soil::physics_engine::impl::debug_renderer()
 {
     return debug_renderer_.get();
 }
@@ -214,9 +214,9 @@ void soil::physics_engine::update(glm::vec3 const& camera_position)
     impl_->update(camera_position);
 }
 
-vkrndr::vulkan_scene* soil::physics_engine::render_scene()
+soil::bullet_debug_renderer* soil::physics_engine::debug_renderer()
 {
-    return impl_->render_scene();
+    return impl_->debug_renderer();
 }
 
 void soil::physics_engine::attach_renderer(vkrndr::vulkan_device* const device,

@@ -4,6 +4,7 @@
 #include <global_data.hpp>
 #include <gltf_manager.hpp>
 #include <imgui_render_layer.hpp>
+#include <vkrndr_scene.hpp>
 #include <vulkan_buffer.hpp>
 #include <vulkan_commands.hpp>
 #include <vulkan_device.hpp>
@@ -11,7 +12,6 @@
 #include <vulkan_image.hpp>
 #include <vulkan_memory.hpp>
 #include <vulkan_queue.hpp>
-#include <vulkan_scene.hpp>
 #include <vulkan_swap_chain.hpp>
 #include <vulkan_utility.hpp>
 #include <vulkan_window.hpp>
@@ -165,7 +165,7 @@ void vkrndr::vulkan_renderer::imgui_layer(bool const state)
     }
 }
 
-bool vkrndr::vulkan_renderer::begin_frame(vulkan_scene* const scene)
+bool vkrndr::vulkan_renderer::begin_frame(scene* const scene)
 {
     if (swap_chain_refresh.load())
     {
@@ -220,7 +220,7 @@ void vkrndr::vulkan_renderer::end_frame()
         });
 }
 
-void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
+void vkrndr::vulkan_renderer::draw(scene* const scene)
 {
     VkCommandBuffer command_buffer{
         frame_data_->present_command_buffers
