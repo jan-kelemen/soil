@@ -13,18 +13,8 @@ vkrndr::vulkan_queue vkrndr::create_queue(vulkan_device const* const device,
 
     rv.family = family;
     vkGetDeviceQueue(device->logical, family, queue_index, &rv.queue);
-    rv.command_pool = create_command_pool(device, family);
 
     return rv;
-}
-
-void vkrndr::destroy(vulkan_device const* const device,
-    vulkan_queue* const queue)
-{
-    if (queue)
-    {
-        vkDestroyCommandPool(device->logical, queue->command_pool, nullptr);
-    }
 }
 
 vkrndr::queue_families vkrndr::find_queue_families(

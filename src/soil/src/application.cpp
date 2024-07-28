@@ -168,19 +168,8 @@ void soil::application::draw(VkImageView target_image,
     VkCommandBuffer command_buffer,
     VkExtent2D extent)
 {
-    VkCommandBufferInheritanceInfo inheritance_info{};
-    inheritance_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-
-    VkCommandBufferBeginInfo secondary_begin_info{};
-    secondary_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    secondary_begin_info.pInheritanceInfo = &inheritance_info;
-    vkrndr::check_result(
-        vkBeginCommandBuffer(command_buffer, &secondary_begin_info));
-
     terrain_renderer_->draw(target_image, command_buffer, extent);
     physics_.render_scene()->draw(target_image, command_buffer, extent);
-
-    vkEndCommandBuffer(command_buffer);
 }
 
 void soil::application::draw_imgui()

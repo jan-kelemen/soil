@@ -214,10 +214,6 @@ void vkrndr::destroy(vulkan_device* const device)
 {
     if (device)
     {
-        for (vulkan_queue& queue : device->queues)
-        {
-            destroy(device, &queue);
-        }
         vmaDestroyAllocator(device->allocator);
         vkDestroyDevice(device->logical, nullptr);
     }

@@ -59,8 +59,6 @@ vkrndr::imgui_render_layer::imgui_render_layer(
     : window_{window}
     , device_{device}
     , descriptor_pool_{create_descriptor_pool(device)}
-    , command_buffers_{vulkan_swap_chain::max_frames_in_flight,
-          vulkan_swap_chain::max_frames_in_flight}
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -104,12 +102,6 @@ vkrndr::imgui_render_layer::imgui_render_layer(
     init_info.UseDynamicRendering = true;
     init_info.PipelineRenderingCreateInfo = rendering_create_info;
     ImGui_ImplVulkan_Init(&init_info);
-
-    create_command_buffers(device,
-        device->present_queue->command_pool,
-        vulkan_swap_chain::max_frames_in_flight,
-        VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        command_buffers_.as_span());
 }
 
 vkrndr::imgui_render_layer::~imgui_render_layer()
@@ -130,14 +122,11 @@ void vkrndr::imgui_render_layer::begin_frame()
     ImGui::NewFrame();
 }
 
-VkCommandBuffer vkrndr::imgui_render_layer::draw(VkImage target_image,
+void vkrndr::imgui_render_layer::draw(VkCommandBuffer command_buffer,
+    VkImage target_image,
     VkImageView target_image_view,
     VkExtent2D extent)
 {
-    auto& command_buffer{*command_buffers_};
-
-    check_result(vkResetCommandBuffer(command_buffer, 0));
-
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     check_result(vkBeginCommandBuffer(command_buffer, &begin_info));
@@ -171,10 +160,6 @@ VkCommandBuffer vkrndr::imgui_render_layer::draw(VkImage target_image,
     transition_to_present_layout(target_image, command_buffer);
 
     check_result(vkEndCommandBuffer(command_buffer));
-
-    command_buffers_.cycle();
-
-    return command_buffer;
 }
 
 void vkrndr::imgui_render_layer::end_frame()

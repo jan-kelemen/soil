@@ -82,30 +82,48 @@ vkrndr::vulkan_renderer::vulkan_renderer(vulkan_window* const window,
     , swap_chain_{std::make_unique<vulkan_swap_chain>(window_,
           context_,
           device_)}
-    , command_buffers_{vulkan_swap_chain::max_frames_in_flight,
-          vulkan_swap_chain::max_frames_in_flight}
-    , secondary_buffers_{vulkan_swap_chain::max_frames_in_flight,
+    , frame_data_{vulkan_swap_chain::max_frames_in_flight,
           vulkan_swap_chain::max_frames_in_flight}
     , descriptor_pool_{create_descriptor_pool(device)}
     , font_manager_{std::make_unique<font_manager>()}
     , gltf_manager_{std::make_unique<gltf_manager>(this)}
 {
-    create_command_buffers(device_,
-        device->present_queue->command_pool,
-        vulkan_swap_chain::max_frames_in_flight,
-        VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        command_buffers_.as_span());
+    for (frame_data& fd : frame_data_.as_span())
+    {
+        fd.present_queue = device_->present_queue;
+        fd.present_command_pool =
+            create_command_pool(device, fd.present_queue->family);
 
-    create_command_buffers(device_,
-        device->present_queue->command_pool,
-        vulkan_swap_chain::max_frames_in_flight,
-        VK_COMMAND_BUFFER_LEVEL_SECONDARY,
-        secondary_buffers_.as_span());
+        if (device_->present_queue == device_->transfer_queue)
+        {
+            fd.transfer_queue = fd.present_queue;
+            fd.transfer_command_pool = fd.present_command_pool;
+        }
+        else
+        {
+            fd.transfer_queue = device_->transfer_queue;
+            fd.transfer_command_pool =
+                create_command_pool(device, fd.transfer_queue->family);
+        }
+    }
 }
 
 vkrndr::vulkan_renderer::~vulkan_renderer()
 {
     imgui_layer_.reset();
+
+    for (frame_data& fd : frame_data_.as_span())
+    {
+        if (fd.present_queue != fd.transfer_queue)
+        {
+            vkDestroyCommandPool(device_->logical,
+                fd.transfer_command_pool,
+                nullptr);
+        }
+        vkDestroyCommandPool(device_->logical,
+            fd.present_command_pool,
+            nullptr);
+    }
 
     vkDestroyDescriptorPool(device_->logical, descriptor_pool_, nullptr);
 }
@@ -163,15 +181,12 @@ bool vkrndr::vulkan_renderer::begin_frame(vulkan_scene* const scene)
         return false;
     }
 
-    if (!swap_chain_->acquire_next_image(command_buffers_.index(),
-            image_index_))
+    if (!swap_chain_->acquire_next_image(frame_data_.index(), image_index_))
     {
         return false;
     }
 
-    submit_buffers_.push_back(*command_buffers_);
-
-    VkCommandBuffer primary_buffer{submit_buffers_[0]};
+    VkCommandBuffer primary_buffer{request_command_buffer(false)};
 
     check_result(vkResetCommandBuffer(primary_buffer, 0));
 
@@ -197,38 +212,43 @@ void vkrndr::vulkan_renderer::end_frame()
         imgui_layer_->end_frame();
     }
 
-    submit_buffers_.clear();
+    frame_data_.cycle(
+        [](frame_data& fd, frame_data const&)
+        {
+            fd.used_present_command_buffers_ = 0;
+            fd.used_transfer_command_buffers = 0;
+        });
 }
 
 void vkrndr::vulkan_renderer::draw(vulkan_scene* scene)
 {
-    VkCommandBuffer secondary_buffer{*secondary_buffers_};
-    check_result(vkResetCommandBuffer(secondary_buffer, 0));
+    VkCommandBuffer command_buffer{
+        frame_data_->present_command_buffers
+            [frame_data_->used_present_command_buffers_ - 1]};
     scene->draw(swap_chain_->image_view(image_index_),
-        secondary_buffer,
+        command_buffer,
         extent());
-    vkCmdExecuteCommands(submit_buffers_[0], 1, &secondary_buffer);
 
     if (imgui_layer_)
     {
         scene->draw_imgui();
-        submit_buffers_.push_back(
-            imgui_layer_->draw(swap_chain_->image(image_index_),
-                swap_chain_->image_view(image_index_),
-                extent()));
+        VkCommandBuffer imgui_command_buffer{request_command_buffer(false)};
+        imgui_layer_->draw(imgui_command_buffer,
+            swap_chain_->image(image_index_),
+            swap_chain_->image_view(image_index_),
+            extent());
     }
 
     transition_to_present_layout(swap_chain_->image(image_index_),
-        submit_buffers_.front());
+        command_buffer);
 
-    check_result(vkEndCommandBuffer(submit_buffers_.front()));
+    check_result(vkEndCommandBuffer(command_buffer));
 
-    swap_chain_->submit_command_buffers(submit_buffers_,
-        command_buffers_.index(),
+    swap_chain_->submit_command_buffers(
+        std::span{frame_data_->present_command_buffers.data(),
+            frame_data_->used_present_command_buffers_},
+        frame_data_.index(),
         image_index_);
-
-    command_buffers_.cycle();
-    secondary_buffers_.cycle();
 }
 
 vkrndr::vulkan_image vkrndr::vulkan_renderer::load_texture(
@@ -295,11 +315,11 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT)};
 
-    vulkan_queue* const queue{device_->present_queue};
+    vulkan_queue* const queue{frame_data_->present_queue};
 
     VkCommandBuffer present_queue_buffer; // NOLINT
     begin_single_time_commands(device_,
-        queue->command_pool,
+        frame_data_->present_command_pool,
         1,
         std::span{&present_queue_buffer, 1});
 
@@ -327,7 +347,7 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
     end_single_time_commands(device_,
         queue->queue,
         std::span{&present_queue_buffer, 1},
-        queue->command_pool);
+        frame_data_->present_command_pool);
 
     destroy(device_, &staging_buffer);
 
@@ -337,11 +357,11 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
 void vkrndr::vulkan_renderer::transfer_buffer(vulkan_buffer const& source,
     vulkan_buffer const& target)
 {
-    vulkan_queue* const transfer_queue{device_->transfer_queue};
+    vulkan_queue* const transfer_queue{frame_data_->transfer_queue};
 
     VkCommandBuffer command_buffer; // NOLINT
     begin_single_time_commands(device_,
-        transfer_queue->command_pool,
+        frame_data_->transfer_command_pool,
         1,
         std::span{&command_buffer, 1});
 
@@ -353,7 +373,7 @@ void vkrndr::vulkan_renderer::transfer_buffer(vulkan_buffer const& source,
     end_single_time_commands(device_,
         transfer_queue->queue,
         std::span{&command_buffer, 1},
-        transfer_queue->command_pool);
+        frame_data_->transfer_command_pool);
 }
 
 vkrndr::vulkan_font vkrndr::vulkan_renderer::load_font(
@@ -394,7 +414,7 @@ vkrndr::vulkan_font vkrndr::vulkan_renderer::load_font(
 
     VkCommandBuffer present_queue_buffer; // NOLINT
     begin_single_time_commands(device_,
-        queue->command_pool,
+        frame_data_->present_command_pool,
         1,
         std::span{&present_queue_buffer, 1});
 
@@ -410,7 +430,7 @@ vkrndr::vulkan_font vkrndr::vulkan_renderer::load_font(
     end_single_time_commands(device_,
         queue->queue,
         std::span{&present_queue_buffer, 1},
-        queue->command_pool);
+        frame_data_->present_command_pool);
 
     destroy(device_, &staging_buffer);
 
@@ -424,4 +444,48 @@ std::unique_ptr<vkrndr::gltf_model> vkrndr::vulkan_renderer::load_model(
     std::filesystem::path const& model_path)
 {
     return gltf_manager_->load(model_path);
+}
+
+VkCommandBuffer vkrndr::vulkan_renderer::request_command_buffer(
+    bool const transfer_only)
+{
+    if (transfer_only &&
+        frame_data_->present_queue != frame_data_->transfer_queue)
+    {
+        if (frame_data_->used_transfer_command_buffers ==
+            frame_data_->transfer_command_buffers.size())
+        {
+            frame_data_->transfer_command_buffers.resize(
+                frame_data_->transfer_command_buffers.size() + 1);
+
+            create_command_buffers(device_,
+                frame_data_->transfer_command_pool,
+                1,
+                VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                std::span{&frame_data_->transfer_command_buffers.back(), 1});
+        }
+
+        VkCommandBuffer rv{frame_data_->transfer_command_buffers
+                               [frame_data_->used_transfer_command_buffers++]};
+        check_result(vkResetCommandBuffer(rv, 0));
+        return rv;
+    }
+
+    if (frame_data_->used_present_command_buffers_ ==
+        frame_data_->present_command_buffers.size())
+    {
+        frame_data_->present_command_buffers.resize(
+            frame_data_->present_command_buffers.size() + 1);
+
+        create_command_buffers(device_,
+            frame_data_->present_command_pool,
+            1,
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            std::span{&frame_data_->present_command_buffers.back(), 1});
+    }
+
+    VkCommandBuffer rv{frame_data_->present_command_buffers
+                           [frame_data_->used_present_command_buffers_++]};
+    check_result(vkResetCommandBuffer(rv, 0));
+    return rv;
 }

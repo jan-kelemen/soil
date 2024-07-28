@@ -33,7 +33,8 @@ namespace vkrndr
     public: // Interface
         void begin_frame();
 
-        [[nodiscard]] VkCommandBuffer draw(VkImage target_image,
+        [[nodiscard]] void draw(VkCommandBuffer command_buffer,
+            VkImage target_image,
             VkImageView target_image_view,
             VkExtent2D extent);
 
@@ -52,7 +53,6 @@ namespace vkrndr
         vulkan_device* device_;
 
         VkDescriptorPool descriptor_pool_;
-        cppext::cycled_buffer<VkCommandBuffer> command_buffers_;
 
         bool frame_rendered_{true};
     };

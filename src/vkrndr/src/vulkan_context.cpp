@@ -24,7 +24,8 @@ namespace
     constexpr std::array const validation_layers{"VK_LAYER_KHRONOS_validation"};
 
     constexpr std::array const validation_feature_enable{
-        VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT};
+        VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+        VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT};
 
     constexpr VkValidationFeaturesEXT validation_features = {
         VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,

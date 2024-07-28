@@ -25,6 +25,7 @@ namespace vkrndr
     class vulkan_scene;
     class vulkan_swap_chain;
     class vulkan_window;
+    struct vulkan_queue;
 } // namespace vkrndr
 
 namespace vkrndr
@@ -87,6 +88,24 @@ namespace vkrndr
 
         vulkan_renderer& operator=(vulkan_renderer&&) noexcept = delete;
 
+    private: // Types
+        struct [[nodiscard]] frame_data final
+        {
+            vulkan_queue* present_queue{};
+            VkCommandPool present_command_pool{VK_NULL_HANDLE};
+            std::vector<VkCommandBuffer> present_command_buffers;
+            size_t used_present_command_buffers_{};
+
+            vulkan_queue* transfer_queue{};
+            VkCommandPool transfer_command_pool{VK_NULL_HANDLE};
+            std::vector<VkCommandBuffer> transfer_command_buffers;
+            size_t used_transfer_command_buffers{};
+        };
+
+    private:
+        [[nodiscard]] VkCommandBuffer request_command_buffer(
+            bool transfer_only);
+
     private: // Data
         vulkan_window* window_;
         vulkan_context* context_;
@@ -94,8 +113,7 @@ namespace vkrndr
 
         std::unique_ptr<vulkan_swap_chain> swap_chain_;
 
-        cppext::cycled_buffer<VkCommandBuffer> command_buffers_;
-        cppext::cycled_buffer<VkCommandBuffer> secondary_buffers_;
+        cppext::cycled_buffer<frame_data> frame_data_;
 
         VkDescriptorPool descriptor_pool_{};
 
@@ -103,7 +121,6 @@ namespace vkrndr
         std::unique_ptr<font_manager> font_manager_;
         std::unique_ptr<gltf_manager> gltf_manager_;
 
-        std::vector<VkCommandBuffer> submit_buffers_;
         uint32_t image_index_{};
     };
 } // namespace vkrndr

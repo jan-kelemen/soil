@@ -17,14 +17,11 @@ namespace vkrndr
     {
         uint32_t family{};
         VkQueue queue{VK_NULL_HANDLE};
-        VkCommandPool command_pool{VK_NULL_HANDLE};
     };
 
     vulkan_queue create_queue(vulkan_device const* device,
         uint32_t family,
         uint32_t queue_index);
-
-    void destroy(vulkan_device const* device, vulkan_queue* queue);
 
     struct [[nodiscard]] queue_families final
     {
