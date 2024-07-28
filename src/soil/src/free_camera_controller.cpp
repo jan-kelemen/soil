@@ -41,7 +41,27 @@ void soil::free_camera_controller::handle_event(SDL_Event const& event)
             update_needed_ = true;
         }
     }
-    else if (event.type == SDL_KEYUP || event.type == SDL_KEYDOWN)
+    else if (event.type == SDL_MOUSEMOTION && mouse_->captured())
+    {
+        constexpr auto mouse_sensitivity_{0.1f};
+
+        auto const& yaw_pitch{camera_->yaw_pitch()};
+        auto const& mouse_offset{mouse_->relative_offset()};
+
+        auto const yaw{
+            yaw_pitch.x + cppext::as_fp(mouse_offset.x) * mouse_sensitivity_};
+        auto const pitch{
+            yaw_pitch.y + cppext::as_fp(-mouse_offset.y) * mouse_sensitivity_};
+
+        camera_->set_yaw_pitch(
+            {fmodf(yaw, 360), std::clamp(pitch, -85.0f, 85.0f)});
+
+        update_needed_ = true;
+    }
+}
+
+void soil::free_camera_controller::update(float delta_time)
+{
     {
         int keyboard_state_length; // NOLINT
         uint8_t const* const keyboard_state{
@@ -75,27 +95,7 @@ void soil::free_camera_controller::handle_event(SDL_Event const& event)
 
         update_needed_ = true;
     }
-    else if (event.type == SDL_MOUSEMOTION && mouse_->captured())
-    {
-        constexpr auto mouse_sensitivity_{0.1f};
 
-        auto const& yaw_pitch{camera_->yaw_pitch()};
-        auto const& mouse_offset{mouse_->relative_offset()};
-
-        auto const yaw{
-            yaw_pitch.x + cppext::as_fp(mouse_offset.x) * mouse_sensitivity_};
-        auto const pitch{
-            yaw_pitch.y + cppext::as_fp(-mouse_offset.y) * mouse_sensitivity_};
-
-        camera_->set_yaw_pitch(
-            {fmodf(yaw, 360), std::clamp(pitch, -85.0f, 85.0f)});
-
-        update_needed_ = true;
-    }
-}
-
-void soil::free_camera_controller::update(float delta_time)
-{
     if (update_needed_ || velocity_ != glm::vec3{0.0f, 0.0f, 0.0f})
     {
         camera_->set_position(camera_->position() + velocity_ * delta_time);
