@@ -46,6 +46,7 @@
 
   # glm aliases
   { include: [ "<glm/detail/func_common.inl>", private, "<glm/common.hpp>", public] },
+  { include: [ "<glm/detail/func_matrix.inl>", private, "<glm/matrix.hpp>", public] },
   { include: [ "<glm/detail/type_vec2.hpp>", private, "<glm/vec2.hpp>", public ] },
   { include: [ "<glm/detail/type_vec2.inl>", private, "<glm/vec2.hpp>", public ] },
   { include: [ "<glm/ext/vector_int2.hpp>", private, "<glm/vec2.hpp>", public ] },
@@ -73,7 +74,9 @@
   { include: [ "<glm/detail/type_quat.hpp>", private, "<glm/gtc/quaternion.hpp>", public ] },
   { include: [ "<glm/detail/func_geometric.inl>", private, "<glm/geometric.hpp>", public ] },
   { include: [ "<glm/detail/func_trigonometric.inl>", private, "<glm/trigonometric.hpp>", public ] },
+  { symbol: [ "glm::vec2", private, "<glm/vec2.hpp>", public ] },
   { symbol: [ "glm::vec3", private, "<glm/vec3.hpp>", public ] },
+  { symbol: [ "glm::vec4", private, "<glm/vec4.hpp>", public ] },
   { symbol: [ "glm::mat4", private, "<glm/mat4x4.hpp>", public ] },
 
   # bullet3 aliases

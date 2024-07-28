@@ -63,9 +63,10 @@ namespace cppext
 
         [[nodiscard]] T const* data() const;
 
-        // cppcheck-suppress functionConst
+        // cppcheck-suppress [functionConst, returnByReference]
         [[nodiscard]] std::span<T> as_span();
 
+        // cppcheck-suppress returnByReference
         [[nodiscard]] std::span<T const> as_span() const;
 
     public:

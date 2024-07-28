@@ -20,8 +20,7 @@
 
 namespace vkrndr
 {
-    class vulkan_renderer;
-    class vulkan_scene;
+    class camera;
 } // namespace vkrndr
 
 namespace soil

@@ -2,6 +2,9 @@
 
 #include <vulkan_utility.hpp>
 
+#include <cassert>
+#include <utility>
+
 vkrndr::render_pass_guard::render_pass_guard(VkCommandBuffer command_buffer)
     : command_buffer_{command_buffer}
 {

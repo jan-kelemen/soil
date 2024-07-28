@@ -9,7 +9,6 @@
 #include <vkrndr_camera.hpp>
 #include <vkrndr_render_pass.hpp>
 #include <vulkan_buffer.hpp>
-#include <vulkan_depth_buffer.hpp>
 #include <vulkan_descriptors.hpp>
 #include <vulkan_device.hpp>
 #include <vulkan_image.hpp>
@@ -31,6 +30,7 @@
 
 #include <array>
 #include <cstddef>
+#include <optional>
 #include <ranges>
 
 // IWYU pragma: no_include <filesystem>
@@ -236,8 +236,8 @@ void soil::bullet_debug_renderer::drawLine(btVector3 const& from,
 {
     if (cull_geometry_)
     {
-        if (!(from.distance(camera_position_) <= cull_distance_ ||
-                to.distance(camera_position_) <= cull_distance_))
+        if (from.distance(camera_position_) > cull_distance_ &&
+            to.distance(camera_position_) > cull_distance_)
         {
             return;
         }
@@ -320,7 +320,8 @@ void soil::bullet_debug_renderer::draw(VkImageView target_image,
         depth_buffer_->view);
 
     {
-        auto guard{render_pass.begin(command_buffer, {0, 0, extent})};
+        // cppcheck-suppress unreadVariable
+        auto guard{render_pass.begin(command_buffer, {{0, 0}, extent})};
 
         VkDeviceSize const zero_offset{0};
         vkCmdBindVertexBuffers(command_buffer,

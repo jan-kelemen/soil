@@ -4,12 +4,14 @@
 
 #include <cppext_numeric.hpp>
 
-#include <BulletCollision/CollisionShapes/btCollisionShape.h>
+#include <BulletCollision/CollisionShapes/btCollisionShape.h> // IWYU pragma: keep
 #include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
 
 #include <PerlinNoise.hpp>
 
 #include <memory>
+
+// IWYU pragma: no_include <BulletCollision/CollisionShapes/btConcaveShape.h>
 
 soil::heightmap::heightmap(size_t dimension)
     : dimension_{dimension}

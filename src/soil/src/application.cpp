@@ -7,8 +7,6 @@
 #include <physics_engine.hpp>
 #include <terrain_renderer.hpp>
 
-#include <cppext_numeric.hpp>
-
 #include <niku_application.hpp>
 
 #include <vulkan_depth_buffer.hpp>
@@ -16,7 +14,6 @@
 #include <vulkan_image.hpp>
 #include <vulkan_renderer.hpp>
 #include <vulkan_scene.hpp>
-#include <vulkan_utility.hpp>
 
 #include <BulletCollision/CollisionShapes/btBoxShape.h>
 #include <BulletCollision/CollisionShapes/btCollisionShape.h>
@@ -28,9 +25,7 @@
 #include <SDL_events.h>
 #include <SDL_video.h>
 
-#include <cstddef>
 #include <memory>
-#include <utility>
 
 // IWYU pragma: no_include <BulletCollision/CollisionShapes/btConcaveShape.h>
 // IWYU pragma: no_include <glm/detail/qualifier.hpp>

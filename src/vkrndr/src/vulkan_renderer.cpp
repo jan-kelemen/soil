@@ -6,7 +6,6 @@
 #include <imgui_render_layer.hpp>
 #include <vulkan_buffer.hpp>
 #include <vulkan_commands.hpp>
-#include <vulkan_depth_buffer.hpp>
 #include <vulkan_device.hpp>
 #include <vulkan_font.hpp>
 #include <vulkan_image.hpp>
@@ -22,9 +21,10 @@
 
 #include <stb_image.h>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
-#include <optional>
 #include <span>
 #include <stdexcept>
 #include <utility>
@@ -112,7 +112,7 @@ vkrndr::vulkan_renderer::~vulkan_renderer()
 {
     imgui_layer_.reset();
 
-    for (frame_data& fd : frame_data_.as_span())
+    for (frame_data const& fd : frame_data_.as_span())
     {
         if (fd.present_queue != fd.transfer_queue)
         {

@@ -6,19 +6,21 @@
 #include <cppext_pragma_warning.hpp>
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
+#include <ranges>
 #include <span>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
 // IWYU pragma: no_include <type_traits>
+// IWYU pragma: no_include <functional>
 
 namespace
 {

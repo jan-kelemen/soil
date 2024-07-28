@@ -8,11 +8,6 @@
 
 namespace vkrndr
 {
-    struct vulkan_device;
-} // namespace vkrndr
-
-namespace vkrndr
-{
     struct [[nodiscard]] render_pass_guard final
     {
     public:
@@ -43,6 +38,9 @@ namespace vkrndr
         render_pass(render_pass const&) = default;
 
         render_pass(render_pass&&) noexcept = default;
+
+    public:
+        ~render_pass() = default;
 
     public:
         [[nodiscard]] render_pass_guard begin(VkCommandBuffer command_buffer,

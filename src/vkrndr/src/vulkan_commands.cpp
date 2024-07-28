@@ -3,6 +3,9 @@
 #include <vulkan_device.hpp>
 #include <vulkan_utility.hpp>
 
+#include <cppext_numeric.hpp>
+
+#include <algorithm>
 #include <cassert>
 #include <stdexcept>
 

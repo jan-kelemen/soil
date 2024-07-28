@@ -3,31 +3,41 @@
 #include <heightmap.hpp>
 #include <perspective_camera.hpp>
 
+#include <cppext_cycled_buffer.hpp>
+#include <cppext_numeric.hpp>
 #include <cppext_pragma_warning.hpp>
 
+#include <vkrndr_camera.hpp>
 #include <vkrndr_render_pass.hpp>
-#include <vulkan_depth_buffer.hpp>
+#include <vulkan_buffer.hpp>
 #include <vulkan_descriptors.hpp>
 #include <vulkan_device.hpp>
+#include <vulkan_image.hpp>
+#include <vulkan_memory.hpp>
 #include <vulkan_pipeline.hpp>
 #include <vulkan_renderer.hpp>
 #include <vulkan_utility.hpp>
 
-#include <glm/gtc/type_ptr.hpp>
+#include <glm/geometric.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/matrix.hpp>
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
 #include <imgui.h>
 
-#include <spdlog/spdlog.h>
-
+#include <algorithm>
 #include <array>
+#include <cstddef>
+#include <optional>
 #include <ranges>
+#include <span>
+
+// IWYU pragma: no_include <filesystem>
 
 namespace
 {
-    constexpr uint32_t max_vertex_count{100000};
-
     DISABLE_WARNING_PUSH
     DISABLE_WARNING_STRUCTURE_WAS_PADDED_DUE_TO_ALIGNMENT_SPECIFIER
 
@@ -309,11 +319,14 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
         auto* vertices{staging_map.as<vertex>()};
         auto const create_vertex = [&heightmap](size_t const x, size_t const z)
         {
+            DISABLE_WARNING_PUSH
+            DISABLE_WARNING_MISSING_FIELD_INITIALIZERS
             return vertex{.position = {cppext::as_fp(x),
                               heightmap.value(x, z),
                               cppext::as_fp(z)},
                 .texture_coordinate = {cppext::as_fp(x % 2) * 5,
                     cppext::as_fp(z % 2) * 5}};
+            DISABLE_WARNING_POP
         };
         for (size_t z{}; z != heightmap.dimension() - 1; ++z)
         {
@@ -353,7 +366,7 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
                 (delta_texture1.x * delta_texture2.y -
                     delta_texture2.x * delta_texture1.y)};
 
-            glm::vec3 tan{
+            glm::vec3 const tan{
                 (edge1 * delta_texture2.y - edge2 * delta_texture1.y) * f};
 
             vertices[i].tangent = tan;
@@ -371,7 +384,7 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
         destroy(device_, &staging_buffer);
     }
 
-    float const center_offset{(heightmap.dimension() - 1) / 2.0f};
+    float const center_offset{cppext::as_fp(heightmap.dimension() - 1) / 2.0f};
 
     // Heightmap values range from [0, 1], bullet recenters it to [-0.5, 0.5]
     glm::vec3 offset{center_offset, 0.5f, center_offset};
@@ -416,6 +429,9 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             renderer->descriptor_pool(),
             std::span{&data.descriptor_set, 1});
 
+        DISABLE_WARNING_PUSH
+        DISABLE_WARNING_MISSING_FIELD_INITIALIZERS
+
         bind_descriptor_set(device_,
             data.descriptor_set,
             VkDescriptorBufferInfo{.buffer = data.vertex_uniform.buffer,
@@ -429,6 +445,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* device,
             VkDescriptorImageInfo{.imageView = texture_normal_.view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
             VkDescriptorImageInfo{.sampler = texture_sampler_});
+
+        DISABLE_WARNING_POP
     }
 }
 
@@ -474,8 +492,10 @@ void soil::terrain_renderer::update(vkrndr::camera const& camera,
 
     auto& v{*frame_data_->view_uniform_map.as<view>()};
     v.camera_position = camera.position();
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-static-cast-downcast)
     v.light_position = camera.position() +
         static_cast<soil::perspective_camera const&>(camera).up_direction();
+    // NOLINTEND(cppcoreguidelines-pro-type-static-cast-downcast)
 }
 
 void soil::terrain_renderer::draw(VkImageView target_image,
@@ -495,7 +515,8 @@ void soil::terrain_renderer::draw(VkImageView target_image,
         VkClearValue{.depthStencil = {1.0f, 0}});
 
     {
-        auto guard{render_pass.begin(command_buffer, {0, 0, extent})};
+        // cppcheck-suppress unreadVariable
+        auto guard{render_pass.begin(command_buffer, {{0, 0}, extent})};
 
         VkDeviceSize const zero_offset{0};
         vkCmdBindVertexBuffers(command_buffer,

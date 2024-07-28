@@ -3,8 +3,6 @@
 #include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_stdinc.h>
 
-#include <cassert>
-
 niku::mouse::mouse() : mouse(true) { }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)

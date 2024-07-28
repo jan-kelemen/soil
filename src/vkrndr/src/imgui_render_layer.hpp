@@ -1,8 +1,6 @@
 #ifndef VKRNDR_IMGUI_RENDER_LAYER_INCLUDED
 #define VKRNDR_IMGUI_RENDER_LAYER_INCLUDED
 
-#include <cppext_cycled_buffer.hpp>
-
 #include <vulkan/vulkan_core.h>
 
 namespace vkrndr
@@ -33,7 +31,7 @@ namespace vkrndr
     public: // Interface
         void begin_frame();
 
-        [[nodiscard]] void draw(VkCommandBuffer command_buffer,
+        void draw(VkCommandBuffer command_buffer,
             VkImage target_image,
             VkImageView target_image_view,
             VkExtent2D extent);

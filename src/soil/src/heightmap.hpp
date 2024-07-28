@@ -3,6 +3,7 @@
 
 #include <glm/vec3.hpp>
 
+#include <cstddef>
 #include <memory>
 #include <span>
 #include <vector>
@@ -28,6 +29,7 @@ namespace soil
 
         [[nodiscard]] glm::vec3 const& scaling() const;
 
+        // cppcheck-suppress returnByReference
         [[nodiscard]] std::span<float const> data() const;
 
         [[nodiscard]] float value(size_t x, size_t y) const

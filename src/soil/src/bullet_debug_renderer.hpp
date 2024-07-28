@@ -4,7 +4,6 @@
 #include <cppext_cycled_buffer.hpp>
 
 #include <vulkan_buffer.hpp>
-#include <vulkan_image.hpp>
 #include <vulkan_memory.hpp>
 #include <vulkan_scene.hpp>
 
@@ -12,16 +11,17 @@
 #include <LinearMath/btScalar.h>
 #include <LinearMath/btVector3.h>
 
+#include <glm/vec3.hpp>
+
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
 #include <memory>
 
-class btVector3;
-
 namespace vkrndr
 {
     struct vulkan_device;
+    struct vulkan_image;
     struct vulkan_pipeline;
     class vulkan_renderer;
     class camera;
