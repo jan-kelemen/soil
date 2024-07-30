@@ -87,7 +87,7 @@ void soil::application::on_startup()
     physics_.set_gravity({0.0f, -9.81f, 0.0f});
     // Add heightfield
     {
-        heightmap_ = std::make_unique<heightmap>(25);
+        heightmap_ = std::make_unique<heightmap>(17);
 
         btTransform transform;
         transform.setIdentity();

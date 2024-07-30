@@ -10,6 +10,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
+#include <map>
 #include <memory>
 
 namespace vkrndr
@@ -62,10 +63,15 @@ namespace soil
         {
             vkrndr::vulkan_buffer vertex_uniform;
             vkrndr::mapped_memory vertex_uniform_map{};
-            vkrndr::vulkan_buffer view_uniform;
-            vkrndr::mapped_memory view_uniform_map{};
             VkDescriptorSet descriptor_set{VK_NULL_HANDLE};
         };
+
+    private:
+        void fill_heightmap(heightmap const& heightmap);
+
+        void fill_vertex_buffer(size_t width, size_t height);
+
+        void fill_index_buffer(size_t width, size_t height, uint32_t lod_step);
 
     private:
         vkrndr::vulkan_device* device_;
@@ -73,16 +79,16 @@ namespace soil
         vkrndr::vulkan_image* color_image_;
         vkrndr::vulkan_image* depth_buffer_;
 
-        vkrndr::vulkan_image texture_;
-        vkrndr::vulkan_image texture_normal_;
+        uint32_t vertex_count_{};
+        vkrndr::vulkan_buffer vertex_buffer_;
 
-        VkSampler texture_sampler_;
+        std::map<uint32_t, std::pair<uint32_t, vkrndr::vulkan_buffer>>
+            lod_index_buffers_;
+
+        vkrndr::vulkan_buffer heightmap_;
 
         VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> pipeline_;
-
-        vkrndr::vulkan_buffer vertex_buffer_;
-        uint32_t vertex_count_{};
 
         cppext::cycled_buffer<frame_resources> frame_data_;
     };

@@ -15,7 +15,7 @@
 
 soil::heightmap::heightmap(size_t dimension)
     : dimension_{dimension}
-    , scaling_{10.0f, 5.0f, 10.0f}
+    , scaling_{1.0f, 5.0f, 1.0f}
 {
     data_.reserve(dimension_ * dimension_);
 
