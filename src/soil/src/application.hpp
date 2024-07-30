@@ -21,7 +21,7 @@
 namespace soil
 {
     class heightmap;
-    class terrain_renderer;
+    class terrain;
 } // namespace soil
 
 namespace soil
@@ -78,7 +78,7 @@ namespace soil
         mouse_controller mouse_controller_;
 
         std::unique_ptr<heightmap> heightmap_;
-        std::unique_ptr<terrain_renderer> terrain_renderer_;
+        std::unique_ptr<terrain> terrain_;
 
         vkrndr::vulkan_image color_image_;
         vkrndr::vulkan_image depth_buffer_;

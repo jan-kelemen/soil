@@ -6,7 +6,7 @@
 #include <mouse_controller.hpp>
 #include <perspective_camera.hpp>
 #include <physics_engine.hpp>
-#include <terrain_renderer.hpp>
+#include <terrain.hpp>
 
 #include <cppext_numeric.hpp>
 
@@ -74,7 +74,7 @@ void soil::application::update(float const delta_time)
 {
     camera_controller_.update(delta_time);
 
-    terrain_renderer_->update(camera_, delta_time);
+    terrain_->update(camera_, delta_time);
 
     physics_.update(camera_.position());
     physics_.debug_renderer()->update(camera_, delta_time);
@@ -98,12 +98,11 @@ void soil::application::on_startup()
                 transform)};
         heightfield->setUserIndex(2);
 
-        terrain_renderer_ =
-            std::make_unique<terrain_renderer>(this->vulkan_device(),
-                this->vulkan_renderer(),
-                &color_image_,
-                &depth_buffer_,
-                *heightmap_);
+        terrain_ = std::make_unique<terrain>(this->vulkan_device(),
+            this->vulkan_renderer(),
+            &color_image_,
+            &depth_buffer_,
+            *heightmap_);
     }
 
     // Add static cube
@@ -127,7 +126,7 @@ void soil::application::on_startup()
 
 void soil::application::on_shutdown()
 {
-    terrain_renderer_.reset();
+    terrain_.reset();
 
     physics_.detach_renderer(this->vulkan_device(), this->vulkan_renderer());
 
@@ -169,12 +168,12 @@ void soil::application::draw(VkImageView target_image,
     VkRect2D const scissor{{0, 0}, extent};
     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-    terrain_renderer_->draw(target_image, command_buffer, scissor);
+    terrain_->draw(target_image, command_buffer, scissor);
     physics_.debug_renderer()->draw(target_image, command_buffer, scissor);
 }
 
 void soil::application::draw_imgui()
 {
-    terrain_renderer_->draw_imgui();
+    terrain_->draw_imgui();
     physics_.debug_renderer()->draw_imgui();
 }

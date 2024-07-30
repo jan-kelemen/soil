@@ -3,15 +3,18 @@
 
 #include <cppext_cycled_buffer.hpp>
 
+#include <vkrndr_render_pass.hpp>
 #include <vulkan_buffer.hpp>
 #include <vulkan_image.hpp>
 #include <vulkan_memory.hpp>
 
+#include <glm/vec2.hpp>
+
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
-#include <map>
 #include <memory>
+#include <vector>
 
 namespace vkrndr
 {
@@ -22,20 +25,25 @@ namespace vkrndr
 
 namespace soil
 {
-    class heightmap;
     class perspective_camera;
 } // namespace soil
 
 namespace soil
 {
-    class [[nodiscard]] terrain_renderer
+    struct [[nodiscard]] terrain_vertex final
+    {
+        glm::vec2 position;
+    };
+
+    class [[nodiscard]] terrain_renderer final
     {
     public:
         terrain_renderer(vkrndr::vulkan_device* device,
             vkrndr::vulkan_renderer* renderer,
             vkrndr::vulkan_image* color_image,
             vkrndr::vulkan_image* depth_buffer,
-            heightmap const& heightmap);
+            vkrndr::vulkan_buffer* heightmap_buffer,
+            uint32_t dimension);
 
         terrain_renderer(terrain_renderer const&) = delete;
 
@@ -45,11 +53,23 @@ namespace soil
         ~terrain_renderer();
 
     public:
+        [[nodiscard]] int lod_levels() const
+        {
+            return index_buffers_.back().lod;
+        }
+
         void update(soil::perspective_camera const& camera, float delta_time);
 
-        void draw(VkImageView target_image,
+        vkrndr::render_pass_guard begin_render_pass(VkImageView target_image,
             VkCommandBuffer command_buffer,
             VkRect2D render_area);
+
+        void draw(VkCommandBuffer command_buffer,
+            uint32_t lod,
+            VkBuffer vertex_buffer,
+            int32_t base_vertex);
+
+        void end_render_pass();
 
         void draw_imgui();
 
@@ -66,12 +86,15 @@ namespace soil
             VkDescriptorSet descriptor_set{VK_NULL_HANDLE};
         };
 
+        struct [[nodiscard]] lod_index_buffer final
+        {
+            uint32_t lod;
+            uint32_t index_count;
+            vkrndr::vulkan_buffer index_buffer;
+        };
+
     private:
-        void fill_heightmap(heightmap const& heightmap);
-
-        void fill_vertex_buffer(size_t width, size_t height);
-
-        void fill_index_buffer(size_t width, size_t height, uint32_t lod_step);
+        void fill_index_buffer(uint32_t dimension, uint32_t lod);
 
     private:
         vkrndr::vulkan_device* device_;
@@ -79,13 +102,7 @@ namespace soil
         vkrndr::vulkan_image* color_image_;
         vkrndr::vulkan_image* depth_buffer_;
 
-        uint32_t vertex_count_{};
-        vkrndr::vulkan_buffer vertex_buffer_;
-
-        std::map<uint32_t, std::pair<uint32_t, vkrndr::vulkan_buffer>>
-            lod_index_buffers_;
-
-        vkrndr::vulkan_buffer heightmap_;
+        std::vector<lod_index_buffer> index_buffers_;
 
         VkDescriptorSetLayout descriptor_set_layout_{VK_NULL_HANDLE};
         std::unique_ptr<vkrndr::vulkan_pipeline> pipeline_;

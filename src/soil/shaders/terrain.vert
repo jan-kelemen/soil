@@ -19,11 +19,11 @@ layout(std430, binding = 1) readonly buffer Heightmap {
 layout(location = 0) out vec3 outColor;
 
 void main() {
-    vec4 vertex = vec4(inPosition.x, heightmap.heights[gl_VertexIndex] - pushConsts.lod * 10, inPosition.y, 1.0);
+    vec4 vertex = vec4(inPosition.x, heightmap.heights[gl_VertexIndex], inPosition.y, 1.0);
 
     vec4 worldPosition = transform.model * vertex;
 
     gl_Position = transform.projection * transform.view * worldPosition;
-    outColor = vec3(0.5, heightmap.heights[gl_VertexIndex], 0.5);
+    outColor = vec3(0.5, vertex.y, 0.5);
 }
 
