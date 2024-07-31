@@ -1,9 +1,10 @@
 name: 'Install IWYU'
+description: 'Install include-what-you-use static analyzer'
 inputs:
   version:
     description: 'Version to install'
     required: false
-    default: 18
+    default: '18'
 runs:
   using: 'composite'
   steps:

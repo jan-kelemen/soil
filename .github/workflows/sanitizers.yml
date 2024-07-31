@@ -11,14 +11,11 @@ concurrency:
 
 jobs:
   clang-asan-leak-undefined:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     
     env:
-      GCC_VER: 13
+      GCC_VER: 14
       CLANG_VER: 18
-      
-    strategy:
-      fail-fast: false
         
     steps:
       - name: Checkout repository from github
@@ -54,13 +51,10 @@ jobs:
           ctest --preset release
 
   gcc-tsan:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     
     env:
-      GCC_VER: 13
-      
-    strategy:
-      fail-fast: false
+      GCC_VER: 14
         
     steps:
       - name: Checkout repository from github
@@ -94,9 +88,6 @@ jobs:
 
   msvc-asan:
     runs-on: windows-2022
-
-    strategy:
-      fail-fast: false
 
     steps:
       - name: Initialize

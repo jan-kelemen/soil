@@ -11,10 +11,10 @@ concurrency:
 
 jobs:
   linux:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     
     env:
-      GCC_VER: 13
+      GCC_VER: 14
       CLANG_VER: 18
       
     strategy:
@@ -62,9 +62,6 @@ jobs:
 
   windows:
     runs-on: windows-2022
-
-    strategy:
-      fail-fast: false
 
     steps:
       - name: Initialize

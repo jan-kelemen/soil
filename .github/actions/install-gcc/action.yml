@@ -1,9 +1,10 @@
 name: 'Install GCC'
+description: 'Install GCC compilers'
 inputs:
   version:
     description: 'Version to install'
     required: false
-    default: 13
+    default: '14'
   arch:
     description: 'Target architecture'
     required: false

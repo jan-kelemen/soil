@@ -1,9 +1,10 @@
 name: 'Install Cppcheck'
+description: 'Install Cppcheck static analyzer'
 inputs:
   version:
     description: 'Version to install'
     required: false
-    default: 2.13.0
+    default: '2.14.2'
 runs:
   using: 'composite'
   steps:

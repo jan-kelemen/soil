@@ -1,4 +1,5 @@
 name: 'Setup Conan'
+description: 'Install Conan package manager'
 inputs:
   compiler:
     description: 'Used compiler'
@@ -17,18 +18,18 @@ inputs:
     description: 'Used shell for executing commands'
     required: false
     default: ${{ runner.os == 'Linux' && 'bash' || 'pwsh' }}
-  version:
-    description: 'Version to install'
-    required: false
-    default: 2.4.1
 
 runs:
   using: 'composite'
   steps:
     - name: Install Conan
-      uses: turtlebrowser/get-conan@v1.2
-      with:
-        version: ${{ inputs.version }}
+      shell: ${{ inputs.shell }}
+      run: pipx install conan
+    - name: Echo installed version
+      shell: ${{ inputs.shell }}
+      run: |
+        conan --version
+        echo "version=$(conan --version)" >> $GITHUB_OUTPUT
 
     - name: Install Conan configuration files
       shell: ${{ inputs.shell }}

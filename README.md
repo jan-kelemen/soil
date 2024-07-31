@@ -7,7 +7,7 @@ Necessary build tools are:
   * See [installation instructions](https://docs.conan.io/2/installation.html)
 * One of supported compilers:
   * Clang-18
-  * GCC-13
+  * GCC-14
   * Visual Studio 2022 (MSVC v194)
 
 ```
