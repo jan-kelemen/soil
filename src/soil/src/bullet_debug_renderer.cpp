@@ -50,7 +50,7 @@ namespace
 
     DISABLE_WARNING_POP
 
-    struct [[nodiscard]] transform final
+    struct [[nodiscard]] camera_uniform final
     {
         glm::mat4 view;
         glm::mat4 projection;
@@ -176,7 +176,7 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
         data.vertex_map =
             vkrndr::map_memory(device, data.vertex_buffer.allocation);
 
-        auto const uniform_buffer_size{sizeof(transform)};
+        auto const uniform_buffer_size{sizeof(camera_uniform)};
         data.vertex_uniform = create_buffer(device_,
             uniform_buffer_size,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -286,7 +286,8 @@ int soil::bullet_debug_renderer::getDebugMode() const { return debug_mode_; }
 void soil::bullet_debug_renderer::update(vkrndr::camera const& camera,
     [[maybe_unused]] float const delta_time)
 {
-    *frame_data_->uniform_map.as<transform>() = {.view = camera.view_matrix(),
+    *frame_data_->uniform_map.as<camera_uniform>() = {
+        .view = camera.view_matrix(),
         .projection = camera.projection_matrix()};
 }
 

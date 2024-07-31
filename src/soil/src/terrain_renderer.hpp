@@ -8,6 +8,7 @@
 #include <vulkan_image.hpp>
 #include <vulkan_memory.hpp>
 
+#include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 
 #include <vulkan/vulkan_core.h>
@@ -43,7 +44,7 @@ namespace soil
             vkrndr::vulkan_image* color_image,
             vkrndr::vulkan_image* depth_buffer,
             vkrndr::vulkan_buffer* heightmap_buffer,
-            uint32_t dimension);
+            uint32_t chunk_dimension);
 
         terrain_renderer(terrain_renderer const&) = delete;
 
@@ -58,7 +59,7 @@ namespace soil
             return index_buffers_.back().lod;
         }
 
-        void update(soil::perspective_camera const& camera, float delta_time);
+        void update(soil::perspective_camera const& camera);
 
         vkrndr::render_pass_guard begin_render_pass(VkImageView target_image,
             VkCommandBuffer command_buffer,
@@ -66,8 +67,8 @@ namespace soil
 
         void draw(VkCommandBuffer command_buffer,
             uint32_t lod,
-            VkBuffer vertex_buffer,
-            int32_t base_vertex);
+            vkrndr::vulkan_buffer* vertex_buffer,
+            glm::mat4 const& model);
 
         void end_render_pass();
 
@@ -81,9 +82,14 @@ namespace soil
     private:
         struct [[nodiscard]] frame_resources final
         {
-            vkrndr::vulkan_buffer vertex_uniform;
-            vkrndr::mapped_memory vertex_uniform_map{};
+            vkrndr::vulkan_buffer camera_uniform;
+            vkrndr::mapped_memory camera_uniform_map{};
+            vkrndr::vulkan_buffer chunk_uniform;
+            vkrndr::mapped_memory chunk_uniform_map{};
             VkDescriptorSet descriptor_set{VK_NULL_HANDLE};
+
+            vkrndr::vulkan_buffer* last_bound_vertex_buffer{};
+            uint32_t current_chunk_;
         };
 
         struct [[nodiscard]] lod_index_buffer final
@@ -101,6 +107,8 @@ namespace soil
         vkrndr::vulkan_renderer* renderer_;
         vkrndr::vulkan_image* color_image_;
         vkrndr::vulkan_image* depth_buffer_;
+
+        uint32_t chunk_dimension_;
 
         std::vector<lod_index_buffer> index_buffers_;
 

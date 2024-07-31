@@ -8,14 +8,17 @@
 
 #include <imgui.h>
 
+#include <array>
+
 soil::terrain::terrain(vkrndr::vulkan_device* device,
     vkrndr::vulkan_renderer* renderer,
     vkrndr::vulkan_image* color_image,
     vkrndr::vulkan_image* depth_buffer,
     heightmap const& heightmap)
     : device_{device}
-    , vertex_count_{cppext::narrow<uint32_t>(
-          heightmap.dimension() * heightmap.dimension())}
+    , chunk_dimension_{cppext::narrow<uint32_t>(heightmap.dimension())}
+    , generator_{&heightmap}
+    , vertex_count_{chunk_dimension_ * chunk_dimension_}
     , vertex_buffer_{create_buffer(device,
           vertex_count_ * sizeof(terrain_vertex),
           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -29,7 +32,8 @@ soil::terrain::terrain(vkrndr::vulkan_device* device,
           color_image,
           depth_buffer,
           &heightmap_,
-          cppext::narrow<uint32_t>(heightmap.dimension())}
+          chunk_dimension_}
+
 {
     fill_heightmap(renderer, heightmap);
     fill_vertex_buffer(renderer,
@@ -43,22 +47,53 @@ soil::terrain::~terrain()
 }
 
 void soil::terrain::update(soil::perspective_camera const& camera,
-    float delta_time)
+    [[maybe_unused]] float delta_time)
 {
-    renderer_.update(camera, delta_time);
+    renderer_.update(camera);
 }
 
 void soil::terrain::draw(VkImageView target_image,
     VkCommandBuffer command_buffer,
     VkRect2D render_area)
 {
-    auto guard{
+    float const center_distance{cppext::as_fp(chunk_dimension_ - 1)};
+    float const center_offset{center_distance / 2.0f};
+
+    // Heightmap values range from [0, 1], bullet recenters it to [-0.5, 0.5]
+    glm::vec3 offset{center_offset, 0.5f, center_offset};
+
+    glm::vec3 const scaling{generator_->scaling()};
+
+    // Adjust offsets for scaling of heightmap
+    offset *= -scaling;
+
+    glm::mat4 model_matrix{1.0f};
+    model_matrix = glm::translate(model_matrix, offset);
+
+    auto const guard{
         renderer_.begin_render_pass(target_image, command_buffer, render_area)};
 
+    glm::mat4 const center_model{glm::scale(model_matrix, scaling)};
     renderer_.draw(command_buffer,
         static_cast<uint32_t>(lod_),
-        vertex_buffer_.buffer,
-        0);
+        &vertex_buffer_,
+        center_model);
+
+    std::array const adjecent{glm::vec3{center_distance, 0.0f, 0.0f},
+        glm::vec3{-center_distance, 0.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, center_distance},
+        glm::vec3{0.0f, 0.0f, -center_distance}};
+
+    for (uint32_t i{}; i != adjecent.size(); ++i)
+    {
+        glm::mat4 model{glm::translate(model_matrix, adjecent[i] * scaling)};
+        model = glm::scale(model, scaling);
+
+        renderer_.draw(command_buffer,
+            static_cast<uint32_t>(lod_) + i + 1,
+            &vertex_buffer_,
+            model);
+    }
 
     renderer_.end_render_pass();
 }
@@ -118,7 +153,7 @@ void soil::terrain::fill_vertex_buffer(vkrndr::vulkan_renderer* const renderer,
     {
         for (uint32_t x{}; x != dimension; ++x)
         {
-            vertices[z * dimension + x] = terrain_vertex{
+            vertices[z * dimension + x] = {
                 .position = {cppext::as_fp(x), cppext::as_fp(z)}};
         }
     }

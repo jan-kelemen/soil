@@ -36,16 +36,23 @@
 
 namespace
 {
-    struct [[nodiscard]] transform final
+    constexpr uint32_t max_chunks{100};
+
+    struct [[nodiscard]] camera_uniform final
     {
-        glm::mat4 model;
         glm::mat4 view;
         glm::mat4 projection;
+    };
+
+    struct [[nodiscard]] chunk_uniform final
+    {
+        glm::mat4 model;
     };
 
     struct [[nodiscard]] push_constants final
     {
         uint32_t lod;
+        uint32_t chunk;
     };
 
     consteval auto binding_description()
@@ -104,22 +111,30 @@ namespace
     [[nodiscard]] VkDescriptorSetLayout create_descriptor_set_layout(
         vkrndr::vulkan_device const* const device)
     {
-        VkDescriptorSetLayoutBinding vertex_uniform_binding{};
-        vertex_uniform_binding.binding = 0;
-        vertex_uniform_binding.descriptorType =
+        VkDescriptorSetLayoutBinding camera_uniform_binding{};
+        camera_uniform_binding.binding = 0;
+        camera_uniform_binding.descriptorType =
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        vertex_uniform_binding.descriptorCount = 1;
-        vertex_uniform_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        camera_uniform_binding.descriptorCount = 1;
+        camera_uniform_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        VkDescriptorSetLayoutBinding vertex_storage_binding{};
-        vertex_storage_binding.binding = 1;
-        vertex_storage_binding.descriptorType =
+        VkDescriptorSetLayoutBinding chunk_uniform_binding{};
+        chunk_uniform_binding.binding = 1;
+        chunk_uniform_binding.descriptorType =
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        vertex_storage_binding.descriptorCount = 1;
-        vertex_storage_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        chunk_uniform_binding.descriptorCount = 1;
+        chunk_uniform_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        std::array const bindings{vertex_uniform_binding,
-            vertex_storage_binding};
+        VkDescriptorSetLayoutBinding heightmap_storage_binding{};
+        heightmap_storage_binding.binding = 2;
+        heightmap_storage_binding.descriptorType =
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        heightmap_storage_binding.descriptorCount = 1;
+        heightmap_storage_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        std::array const bindings{camera_uniform_binding,
+            chunk_uniform_binding,
+            heightmap_storage_binding};
 
         VkDescriptorSetLayoutCreateInfo layout_info{};
         layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -137,29 +152,41 @@ namespace
 
     void bind_descriptor_set(vkrndr::vulkan_device const* const device,
         VkDescriptorSet const& descriptor_set,
-        VkDescriptorBufferInfo const vertex_uniform_info,
-        VkDescriptorBufferInfo const vertex_storage_info)
+        VkDescriptorBufferInfo const camera_uniform_info,
+        VkDescriptorBufferInfo const chunk_uniform_info,
+        VkDescriptorBufferInfo const heightmap_storage_info)
     {
-        VkWriteDescriptorSet vertex_uniform_write{};
-        vertex_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        vertex_uniform_write.dstSet = descriptor_set;
-        vertex_uniform_write.dstBinding = 0;
-        vertex_uniform_write.dstArrayElement = 0;
-        vertex_uniform_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        vertex_uniform_write.descriptorCount = 1;
-        vertex_uniform_write.pBufferInfo = &vertex_uniform_info;
+        VkWriteDescriptorSet camera_uniform_write{};
+        camera_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        camera_uniform_write.dstSet = descriptor_set;
+        camera_uniform_write.dstBinding = 0;
+        camera_uniform_write.dstArrayElement = 0;
+        camera_uniform_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        camera_uniform_write.descriptorCount = 1;
+        camera_uniform_write.pBufferInfo = &camera_uniform_info;
 
-        VkWriteDescriptorSet vertex_storage_write{};
-        vertex_storage_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        vertex_storage_write.dstSet = descriptor_set;
-        vertex_storage_write.dstBinding = 1;
-        vertex_storage_write.dstArrayElement = 0;
-        vertex_storage_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        vertex_storage_write.descriptorCount = 1;
-        vertex_storage_write.pBufferInfo = &vertex_storage_info;
+        VkWriteDescriptorSet chunk_uniform_write{};
+        chunk_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        chunk_uniform_write.dstSet = descriptor_set;
+        chunk_uniform_write.dstBinding = 1;
+        chunk_uniform_write.dstArrayElement = 0;
+        chunk_uniform_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        chunk_uniform_write.descriptorCount = 1;
+        chunk_uniform_write.pBufferInfo = &chunk_uniform_info;
 
-        std::array const descriptor_writes{vertex_uniform_write,
-            vertex_storage_write};
+        VkWriteDescriptorSet heightmap_uniform_write{};
+        heightmap_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        heightmap_uniform_write.dstSet = descriptor_set;
+        heightmap_uniform_write.dstBinding = 2;
+        heightmap_uniform_write.dstArrayElement = 0;
+        heightmap_uniform_write.descriptorType =
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        heightmap_uniform_write.descriptorCount = 1;
+        heightmap_uniform_write.pBufferInfo = &heightmap_storage_info;
+
+        std::array const descriptor_writes{camera_uniform_write,
+            chunk_uniform_write,
+            heightmap_uniform_write};
 
         vkUpdateDescriptorSets(device->logical,
             vkrndr::count_cast(descriptor_writes.size()),
@@ -174,17 +201,18 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
     vkrndr::vulkan_image* const color_image,
     vkrndr::vulkan_image* const depth_buffer,
     vkrndr::vulkan_buffer* const heightmap_buffer,
-    uint32_t const dimension)
+    uint32_t const chunk_dimension)
     : device_{device}
     , renderer_{renderer}
     , color_image_{color_image}
     , depth_buffer_{depth_buffer}
+    , chunk_dimension_{chunk_dimension}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
 {
-    auto const max_lod{static_cast<uint32_t>(round(log2(dimension))) + 1};
+    auto const max_lod{static_cast<uint32_t>(round(log2(chunk_dimension))) + 1};
     for (uint32_t i{}; i != max_lod; ++i)
     {
-        fill_index_buffer(dimension, i);
+        fill_index_buffer(chunk_dimension, i);
     }
 
     pipeline_ = std::make_unique<vkrndr::vulkan_pipeline>(
@@ -208,37 +236,30 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
                 VK_FRONT_FACE_COUNTER_CLOCKWISE)
             .build());
 
-    float const center_offset{cppext::as_fp(dimension - 1) / 2.0f};
-
-    // Heightmap values range from [0, 1], bullet recenters it to [-0.5, 0.5]
-    glm::vec3 offset{center_offset, 0.5f, center_offset};
-
-    glm::vec3 heightmap_scaling{1.0f, 5.0f, 1.0f}; // TODO-JK: remove me
-
-    // Adjust offsets for scaling of heightmap
-    offset *= -heightmap_scaling;
-
-    glm::mat4 model_matrix{1.0f};
-    model_matrix = glm::translate(model_matrix, offset);
-    model_matrix = glm::scale(model_matrix, heightmap_scaling);
-
-    glm::mat4 const normal_matrix{glm::transpose(glm::inverse(model_matrix))};
-
     frame_data_ =
         cppext::cycled_buffer<frame_resources>{renderer->image_count(),
             renderer->image_count()};
     for (auto const& [index, data] :
         std::views::enumerate(frame_data_.as_span()))
     {
-        auto const uniform_buffer_size{sizeof(transform)};
-        data.vertex_uniform = create_buffer(device_,
-            uniform_buffer_size,
+        auto const camera_uniform_buffer_size{sizeof(camera_uniform)};
+        data.camera_uniform = create_buffer(device_,
+            camera_uniform_buffer_size,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        data.vertex_uniform_map =
-            vkrndr::map_memory(device, data.vertex_uniform.allocation);
-        data.vertex_uniform_map.as<transform>()->model = model_matrix;
+        data.camera_uniform_map =
+            vkrndr::map_memory(device, data.camera_uniform.allocation);
+
+        auto const chunk_uniform_buffer_size{
+            sizeof(chunk_uniform) * max_chunks};
+        data.chunk_uniform = create_buffer(device_,
+            chunk_uniform_buffer_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        data.chunk_uniform_map =
+            vkrndr::map_memory(device, data.chunk_uniform.allocation);
 
         create_descriptor_sets(device_,
             descriptor_set_layout_,
@@ -250,9 +271,12 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
 
         bind_descriptor_set(device_,
             data.descriptor_set,
-            VkDescriptorBufferInfo{.buffer = data.vertex_uniform.buffer,
+            VkDescriptorBufferInfo{.buffer = data.camera_uniform.buffer,
                 .offset = 0,
-                .range = uniform_buffer_size},
+                .range = camera_uniform_buffer_size},
+            VkDescriptorBufferInfo{.buffer = data.chunk_uniform.buffer,
+                .offset = 0,
+                .range = chunk_uniform_buffer_size},
             VkDescriptorBufferInfo{.buffer = heightmap_buffer->buffer,
                 .offset = 0,
                 .range = heightmap_buffer->size});
@@ -270,8 +294,11 @@ soil::terrain_renderer::~terrain_renderer()
             1,
             &data.descriptor_set);
 
-        unmap_memory(device_, &data.vertex_uniform_map);
-        destroy(device_, &data.vertex_uniform);
+        unmap_memory(device_, &data.chunk_uniform_map);
+        destroy(device_, &data.chunk_uniform);
+
+        unmap_memory(device_, &data.camera_uniform_map);
+        destroy(device_, &data.camera_uniform);
     }
 
     destroy(device_, pipeline_.get());
@@ -287,12 +314,11 @@ soil::terrain_renderer::~terrain_renderer()
     }
 }
 
-void soil::terrain_renderer::update(soil::perspective_camera const& camera,
-    [[maybe_unused]] float const delta_time)
+void soil::terrain_renderer::update(soil::perspective_camera const& camera)
 {
-    auto& uniform{*frame_data_->vertex_uniform_map.as<transform>()};
-    uniform.view = camera.view_matrix();
-    uniform.projection = camera.projection_matrix();
+    auto& cam_uniform{*frame_data_->camera_uniform_map.as<camera_uniform>()};
+    cam_uniform.view = camera.view_matrix();
+    cam_uniform.projection = camera.projection_matrix();
 }
 
 vkrndr::render_pass_guard soil::terrain_renderer::begin_render_pass(
@@ -325,16 +351,29 @@ vkrndr::render_pass_guard soil::terrain_renderer::begin_render_pass(
 
 void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
     uint32_t const lod,
-    VkBuffer vertex_buffer,
-    int32_t const base_vertex)
+    vkrndr::vulkan_buffer* const vertex_buffer,
+    glm::mat4 const& model)
 {
-    VkDeviceSize const zero_offset{0};
-    vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &zero_offset);
+    if (frame_data_->last_bound_vertex_buffer != vertex_buffer)
+    {
+        VkDeviceSize const zero_offset{0};
+        vkCmdBindVertexBuffers(command_buffer,
+            0,
+            1,
+            &vertex_buffer->buffer,
+            &zero_offset);
+        frame_data_->last_bound_vertex_buffer = vertex_buffer;
+    }
 
     if (auto it{std::ranges::find(index_buffers_, lod, &lod_index_buffer::lod)};
         it != std::cend(index_buffers_))
     {
-        push_constants const constants{.lod = lod};
+        push_constants const constants{.lod = lod,
+            .chunk = frame_data_->current_chunk_};
+
+        auto* const ch_uniform{
+            frame_data_->chunk_uniform_map.as<chunk_uniform>()};
+        ch_uniform[frame_data_->current_chunk_].model = model;
 
         vkCmdPushConstants(command_buffer,
             *pipeline_->pipeline_layout,
@@ -348,11 +387,21 @@ void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
             0,
             VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(command_buffer, it->index_count, 1, 0, base_vertex, 0);
+        vkCmdDrawIndexed(command_buffer, it->index_count, 1, 0, 0, 0);
+
+        ++frame_data_->current_chunk_;
     }
 }
 
-void soil::terrain_renderer::end_render_pass() { frame_data_.cycle(); }
+void soil::terrain_renderer::end_render_pass()
+{
+    frame_data_.cycle(
+        [](frame_resources& current, frame_resources const&)
+        {
+            current.last_bound_vertex_buffer = nullptr;
+            current.current_chunk_ = 0;
+        });
+}
 
 void soil::terrain_renderer::draw_imgui() { ImGui::ShowMetricsWindow(); }
 

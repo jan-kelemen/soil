@@ -66,6 +66,9 @@ namespace soil
     private:
         vkrndr::vulkan_device* device_;
 
+        heightmap const* generator_;
+        uint32_t chunk_dimension_;
+
         uint32_t vertex_count_{};
         vkrndr::vulkan_buffer vertex_buffer_;
 
