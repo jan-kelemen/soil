@@ -37,7 +37,7 @@
 
 namespace
 {
-    constexpr uint32_t max_vertex_count{1000};
+    constexpr uint32_t max_vertex_count{10000};
 
     DISABLE_WARNING_PUSH
     DISABLE_WARNING_STRUCTURE_WAS_PADDED_DUE_TO_ALIGNMENT_SPECIFIER
@@ -158,7 +158,7 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
             .with_dynamic_state(VK_DYNAMIC_STATE_LINE_WIDTH)
             .with_rasterization_samples(device_->max_msaa_samples)
             .add_vertex_input(binding_description(), attribute_descriptions())
-            .with_depth_test(depth_buffer_->format)
+            .with_depth_test(depth_buffer_->format, VK_COMPARE_OP_LESS_OR_EQUAL)
             .build());
 
     frame_data_ =
@@ -244,16 +244,10 @@ void soil::bullet_debug_renderer::drawLine(btVector3 const& from,
     {
         auto* const vertices{frame_data_->vertex_map.as<vertex>()};
 
-        // Offset the vertices by a small amount to resolve Z-fighting with the
-        // terrain
-        static constexpr glm::vec3 vertex_offset{0.0f, 0.01f, 0.0f};
-
         vertices[frame_data_->vertex_count] =
-            vertex{.position = from_bullet(from) + vertex_offset,
-                .color = from_bullet(color)};
+            vertex{.position = from_bullet(from), .color = from_bullet(color)};
         vertices[frame_data_->vertex_count + 1] =
-            vertex{.position = from_bullet(to) + vertex_offset,
-                .color = from_bullet(color)};
+            vertex{.position = from_bullet(to), .color = from_bullet(color)};
 
         frame_data_->vertex_count += 2;
     }

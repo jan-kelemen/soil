@@ -117,7 +117,8 @@ namespace vkrndr
         vulkan_pipeline_builder& with_color_blending(
             VkPipelineColorBlendAttachmentState color_blending);
 
-        vulkan_pipeline_builder& with_depth_test(VkFormat depth_format);
+        vulkan_pipeline_builder& with_depth_test(VkFormat depth_format,
+            VkCompareOp compare = VK_COMPARE_OP_LESS);
 
         vulkan_pipeline_builder& with_stencil_test(VkFormat depth_format,
             VkStencilOpState front,

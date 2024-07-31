@@ -356,7 +356,8 @@ vkrndr::vulkan_pipeline_builder::with_color_blending(
 }
 
 vkrndr::vulkan_pipeline_builder&
-vkrndr::vulkan_pipeline_builder::with_depth_test(VkFormat depth_format)
+vkrndr::vulkan_pipeline_builder::with_depth_test(VkFormat const depth_format,
+    VkCompareOp const compare)
 {
     assert(
         depth_format_ == VK_FORMAT_UNDEFINED || depth_format_ == depth_format);
@@ -377,9 +378,12 @@ vkrndr::vulkan_pipeline_builder::with_depth_test(VkFormat depth_format)
         })};
     DISABLE_WARNING_POP
 
-    depth_stencil.depthTestEnable = VK_TRUE;
-    depth_stencil.depthWriteEnable = VK_TRUE;
-    depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    auto const enabled{
+        depth_format_ != VK_FORMAT_UNDEFINED ? VK_TRUE : VK_FALSE};
+
+    depth_stencil.depthTestEnable = enabled;
+    depth_stencil.depthWriteEnable = enabled;
+    depth_stencil.depthCompareOp = compare;
 
     depth_stencil_ = depth_stencil;
 
@@ -413,7 +417,9 @@ vkrndr::vulkan_pipeline_builder::with_stencil_test(VkFormat depth_format,
         })};
     DISABLE_WARNING_POP
 
-    depth_stencil.stencilTestEnable = VK_TRUE;
+    auto const enabled{
+        depth_format_ != VK_FORMAT_UNDEFINED ? VK_TRUE : VK_FALSE};
+    depth_stencil.stencilTestEnable = enabled;
     depth_stencil.front = front;
     depth_stencil.back = back;
 
