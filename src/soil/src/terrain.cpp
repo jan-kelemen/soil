@@ -16,14 +16,14 @@ soil::terrain::terrain(vkrndr::vulkan_device* device,
     vkrndr::vulkan_image* color_image,
     vkrndr::vulkan_image* depth_buffer)
     : device_{device}
-    , chunk_dimension_{1025}
+    , chunk_dimension_{33}
     , vertex_count_{chunk_dimension_ * chunk_dimension_}
     , vertex_buffer_{create_buffer(device,
           vertex_count_ * sizeof(terrain_vertex),
           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)}
     , heightmap_{create_buffer(device,
-          vertex_count_ * sizeof(float),
+          1025 * 1025 * sizeof(float),
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)}
     , renderer_{device,
@@ -31,6 +31,7 @@ soil::terrain::terrain(vkrndr::vulkan_device* device,
           color_image,
           depth_buffer,
           &heightmap_,
+          1025,
           chunk_dimension_}
 
 {
@@ -66,31 +67,24 @@ void soil::terrain::draw(VkImageView target_image,
     offset *= -scaling;
 
     glm::mat4 model_matrix{1.0f};
-    model_matrix = glm::translate(model_matrix, offset);
 
     auto const guard{
         renderer_.begin_render_pass(target_image, command_buffer, render_area)};
 
     glm::mat4 const center_model{glm::scale(model_matrix, scaling)};
-    renderer_.draw(command_buffer,
-        static_cast<uint32_t>(lod_),
-        &vertex_buffer_,
-        center_model);
-
-    std::array const adjecent{glm::vec3{center_distance, 0.0f, 0.0f},
-        glm::vec3{-center_distance, 0.0f, 0.0f},
-        glm::vec3{0.0f, 0.0f, center_distance},
-        glm::vec3{0.0f, 0.0f, -center_distance}};
-
-    for (uint32_t i{}; i != adjecent.size(); ++i)
+    for (uint32_t j{}; j != 31; ++j)
     {
-        glm::mat4 model{glm::translate(model_matrix, adjecent[i] * scaling)};
-        model = glm::scale(model, scaling);
-
-        renderer_.draw(command_buffer,
-            static_cast<uint32_t>(lod_) + i + 1,
-            &vertex_buffer_,
-            model);
+        for (uint32_t i{}; i != 31; ++i)
+        {
+            renderer_.draw(command_buffer,
+                static_cast<uint32_t>(lod_),
+                j * 33 + i,
+                &vertex_buffer_,
+                glm::translate(center_model,
+                    {cppext::as_fp(i) * center_distance,
+                        0.0f,
+                        cppext::as_fp(j) * center_distance}));
+        }
     }
 
     renderer_.end_render_pass();
@@ -151,8 +145,7 @@ void soil::terrain::fill_vertex_buffer(vkrndr::vulkan_renderer* const renderer)
     {
         for (uint32_t x{}; x != chunk_dimension_; ++x)
         {
-            vertices[z * chunk_dimension_ + x] = {
-                .position = {cppext::as_fp(x), cppext::as_fp(z)}};
+            vertices[z * chunk_dimension_ + x] = {.position = {x, z}};
         }
     }
 

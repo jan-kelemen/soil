@@ -36,7 +36,7 @@
 
 namespace
 {
-    constexpr uint32_t max_chunks{100};
+    constexpr uint32_t max_chunks{33 * 33};
 
     struct [[nodiscard]] camera_uniform final
     {
@@ -53,6 +53,8 @@ namespace
     {
         uint32_t lod;
         uint32_t chunk;
+        uint32_t chunk_dimension;
+        uint32_t terrain_dimension;
     };
 
     consteval auto binding_description()
@@ -70,7 +72,7 @@ namespace
         constexpr std::array descriptions{
             VkVertexInputAttributeDescription{.location = 0,
                 .binding = 0,
-                .format = VK_FORMAT_R32G32_SFLOAT,
+                .format = VK_FORMAT_R32G32_UINT,
                 .offset = offsetof(soil::terrain_vertex, position)}};
 
         return descriptions;
@@ -201,11 +203,13 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
     vkrndr::vulkan_image* const color_image,
     vkrndr::vulkan_image* const depth_buffer,
     vkrndr::vulkan_buffer* const heightmap_buffer,
+    uint32_t const terrain_dimension,
     uint32_t const chunk_dimension)
     : device_{device}
     , renderer_{renderer}
     , color_image_{color_image}
     , depth_buffer_{depth_buffer}
+    , terrain_dimension_{terrain_dimension}
     , chunk_dimension_{chunk_dimension}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
 {
@@ -351,6 +355,7 @@ vkrndr::render_pass_guard soil::terrain_renderer::begin_render_pass(
 
 void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
     uint32_t const lod,
+    uint32_t const chunk_index,
     vkrndr::vulkan_buffer* const vertex_buffer,
     glm::mat4 const& model)
 {
@@ -369,11 +374,13 @@ void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
         it != std::cend(index_buffers_))
     {
         push_constants const constants{.lod = lod,
-            .chunk = frame_data_->current_chunk_};
+            .chunk = chunk_index,
+            .chunk_dimension = chunk_dimension_,
+            .terrain_dimension = terrain_dimension_};
 
         auto* const ch_uniform{
             frame_data_->chunk_uniform_map.as<chunk_uniform>()};
-        ch_uniform[frame_data_->current_chunk_].model = model;
+        ch_uniform[chunk_index].model = model;
 
         vkCmdPushConstants(command_buffer,
             *pipeline_->pipeline_layout,
@@ -388,8 +395,6 @@ void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
             VK_INDEX_TYPE_UINT32);
 
         vkCmdDrawIndexed(command_buffer, it->index_count, 1, 0, 0, 0);
-
-        ++frame_data_->current_chunk_;
     }
 }
 

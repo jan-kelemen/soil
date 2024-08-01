@@ -33,7 +33,7 @@ namespace soil
 {
     struct [[nodiscard]] terrain_vertex final
     {
-        glm::vec2 position;
+        glm::uvec2 position;
     };
 
     class [[nodiscard]] terrain_renderer final
@@ -44,6 +44,7 @@ namespace soil
             vkrndr::vulkan_image* color_image,
             vkrndr::vulkan_image* depth_buffer,
             vkrndr::vulkan_buffer* heightmap_buffer,
+            uint32_t terrain_dimension,
             uint32_t chunk_dimension);
 
         terrain_renderer(terrain_renderer const&) = delete;
@@ -67,6 +68,7 @@ namespace soil
 
         void draw(VkCommandBuffer command_buffer,
             uint32_t lod,
+            uint32_t chunk_index,
             vkrndr::vulkan_buffer* vertex_buffer,
             glm::mat4 const& model);
 
@@ -108,6 +110,7 @@ namespace soil
         vkrndr::vulkan_image* color_image_;
         vkrndr::vulkan_image* depth_buffer_;
 
+        uint32_t terrain_dimension_;
         uint32_t chunk_dimension_;
 
         std::vector<lod_index_buffer> index_buffers_;
