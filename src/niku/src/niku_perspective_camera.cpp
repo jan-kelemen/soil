@@ -16,7 +16,7 @@ niku::perspective_camera::perspective_camera()
           45.0f,
           {0.0f, 1.0f, 0.0f},
           {0.1f, 1000.0f},
-          {45.0f, -45.0f})
+          {-45.0f, 0.0f})
 {
 }
 
@@ -44,6 +44,11 @@ glm::vec2 const& niku::perspective_camera::yaw_pitch() const
 void niku::perspective_camera::set_yaw_pitch(glm::vec2 const& yaw_pitch)
 {
     yaw_pitch_ = yaw_pitch;
+}
+
+void niku::perspective_camera::set_near_far(glm::vec2 const& near_far)
+{
+    near_far_planes_ = near_far;
 }
 
 glm::vec3 const& niku::perspective_camera::up_direction() const

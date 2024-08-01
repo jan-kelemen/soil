@@ -33,6 +33,6 @@ void main() {
     vec4 worldPosition = model * vertex;
 
     gl_Position = camera.projection * camera.view * worldPosition;
-    outColor = vec3(0.5, vertex.y, 0.5);
+    outColor = vec3(0.5, vertex.y / 255, 0.5);
 }
 

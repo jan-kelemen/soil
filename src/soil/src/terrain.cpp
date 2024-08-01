@@ -7,17 +7,16 @@
 #include <vulkan_renderer.hpp>
 
 #include <imgui.h>
+#include <stb_image.h>
 
 #include <array>
 
 soil::terrain::terrain(vkrndr::vulkan_device* device,
     vkrndr::vulkan_renderer* renderer,
     vkrndr::vulkan_image* color_image,
-    vkrndr::vulkan_image* depth_buffer,
-    heightmap const& heightmap)
+    vkrndr::vulkan_image* depth_buffer)
     : device_{device}
-    , chunk_dimension_{cppext::narrow<uint32_t>(heightmap.dimension())}
-    , generator_{&heightmap}
+    , chunk_dimension_{1025}
     , vertex_count_{chunk_dimension_ * chunk_dimension_}
     , vertex_buffer_{create_buffer(device,
           vertex_count_ * sizeof(terrain_vertex),
@@ -35,9 +34,8 @@ soil::terrain::terrain(vkrndr::vulkan_device* device,
           chunk_dimension_}
 
 {
-    fill_heightmap(renderer, heightmap);
-    fill_vertex_buffer(renderer,
-        cppext::narrow<uint32_t>(heightmap.dimension()));
+    fill_heightmap(renderer);
+    fill_vertex_buffer(renderer);
 }
 
 soil::terrain::~terrain()
@@ -62,7 +60,7 @@ void soil::terrain::draw(VkImageView target_image,
     // Heightmap values range from [0, 1], bullet recenters it to [-0.5, 0.5]
     glm::vec3 offset{center_offset, 0.5f, center_offset};
 
-    glm::vec3 const scaling{generator_->scaling()};
+    glm::vec3 const scaling{1.0f, 1.0f, 1.0f};
 
     // Adjust offsets for scaling of heightmap
     offset *= -scaling;
@@ -107,13 +105,17 @@ void soil::terrain::draw_imgui()
     renderer_.draw_imgui();
 }
 
-void soil::terrain::fill_heightmap(vkrndr::vulkan_renderer* const renderer,
-    heightmap const& heightmap)
+void soil::terrain::fill_heightmap(vkrndr::vulkan_renderer* const renderer)
 {
-    auto const dimension{heightmap.dimension()};
+    int width; // NOLINT
+    int height; // NOLINT
+    int channels; // NOLINT
+    stbi_uc* const pixels{
+        stbi_load("heightmap.png", &width, &height, &channels, STBI_grey)};
 
+    auto const size{cppext::narrow<size_t>(width * height)};
     vkrndr::vulkan_buffer staging_buffer{vkrndr::create_buffer(device_,
-        vertex_count_ * sizeof(float),
+        size * sizeof(float),
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
@@ -121,23 +123,19 @@ void soil::terrain::fill_heightmap(vkrndr::vulkan_renderer* const renderer,
     vkrndr::mapped_memory staging_map{
         vkrndr::map_memory(device_, staging_buffer.allocation)};
 
-    auto* const heights{staging_map.as<float>()};
-    for (size_t z{}; z != dimension; ++z)
-    {
-        for (size_t x{}; x != dimension; ++x)
-        {
-            heights[z * dimension + x] = heightmap.value(x, z);
-        }
-    }
+    std::ranges::transform(std::span{reinterpret_cast<uint8_t*>(pixels), size},
+        staging_map.as<float>(),
+        [](uint8_t v) { return cppext::as_fp(v); });
 
     renderer->transfer_buffer(staging_buffer, heightmap_);
+
+    stbi_image_free(pixels);
 
     unmap_memory(device_, &staging_map);
     destroy(device_, &staging_buffer);
 }
 
-void soil::terrain::fill_vertex_buffer(vkrndr::vulkan_renderer* const renderer,
-    uint32_t const dimension)
+void soil::terrain::fill_vertex_buffer(vkrndr::vulkan_renderer* const renderer)
 {
     vkrndr::vulkan_buffer staging_buffer{vkrndr::create_buffer(device_,
         vertex_count_ * sizeof(terrain_vertex),
@@ -149,11 +147,11 @@ void soil::terrain::fill_vertex_buffer(vkrndr::vulkan_renderer* const renderer,
         vkrndr::map_memory(device_, staging_buffer.allocation)};
 
     auto* const vertices{staging_map.as<terrain_vertex>()};
-    for (uint32_t z{}; z != dimension; ++z)
+    for (uint32_t z{}; z != chunk_dimension_; ++z)
     {
-        for (uint32_t x{}; x != dimension; ++x)
+        for (uint32_t x{}; x != chunk_dimension_; ++x)
         {
-            vertices[z * dimension + x] = {
+            vertices[z * chunk_dimension_ + x] = {
                 .position = {cppext::as_fp(x), cppext::as_fp(z)}};
         }
     }

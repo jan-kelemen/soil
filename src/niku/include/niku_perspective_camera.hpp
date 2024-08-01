@@ -33,6 +33,8 @@ namespace niku
 
         void set_yaw_pitch(glm::vec2 const& yaw_pitch);
 
+        void set_near_far(glm::vec2 const& near_far);
+
         [[nodiscard]] glm::vec3 const& up_direction() const;
 
         [[nodiscard]] glm::vec3 const& front_direction() const;

@@ -32,8 +32,7 @@ namespace soil
         terrain(vkrndr::vulkan_device* device,
             vkrndr::vulkan_renderer* renderer,
             vkrndr::vulkan_image* color_image,
-            vkrndr::vulkan_image* depth_buffer,
-            heightmap const& heightmap);
+            vkrndr::vulkan_image* depth_buffer);
 
         terrain(terrain const&) = delete;
 
@@ -57,11 +56,9 @@ namespace soil
         terrain& operator=(terrain&&) noexcept = delete;
 
     private:
-        void fill_heightmap(vkrndr::vulkan_renderer* renderer,
-            heightmap const& heightmap);
+        void fill_heightmap(vkrndr::vulkan_renderer* renderer);
 
-        void fill_vertex_buffer(vkrndr::vulkan_renderer* renderer,
-            uint32_t dimension);
+        void fill_vertex_buffer(vkrndr::vulkan_renderer* renderer);
 
     private:
         vkrndr::vulkan_device* device_;

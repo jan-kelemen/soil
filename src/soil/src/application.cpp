@@ -49,7 +49,8 @@ soil::application::application(bool const debug)
     fixed_update_interval(1.0f / 60.0f);
 
     camera_.resize({512, 512});
-    camera_.set_position({0.0f, 1.76f, 0.0f});
+    camera_.set_position({-512.0f, 200.0f, 512.0f});
+    camera_.set_near_far({0.1f, 10000.0f});
     camera_.update();
 
     resize({512, 512});
@@ -101,8 +102,7 @@ void soil::application::on_startup()
         terrain_ = std::make_unique<terrain>(this->vulkan_device(),
             this->vulkan_renderer(),
             &color_image_,
-            &depth_buffer_,
-            *heightmap_);
+            &depth_buffer_);
     }
 
     // Add static cube
