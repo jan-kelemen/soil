@@ -16,7 +16,7 @@ soil::terrain::terrain(vkrndr::vulkan_device* device,
     vkrndr::vulkan_image* color_image,
     vkrndr::vulkan_image* depth_buffer)
     : device_{device}
-    , chunk_dimension_{33}
+    , chunk_dimension_{65}
     , vertex_count_{chunk_dimension_ * chunk_dimension_}
     , vertex_buffer_{create_buffer(device,
           vertex_count_ * sizeof(terrain_vertex),
@@ -72,13 +72,13 @@ void soil::terrain::draw(VkImageView target_image,
         renderer_.begin_render_pass(target_image, command_buffer, render_area)};
 
     glm::mat4 const center_model{glm::scale(model_matrix, scaling)};
-    for (uint32_t j{}; j != 32; ++j)
+    for (uint32_t j{}; j != 16; ++j)
     {
-        for (uint32_t i{}; i != 32; ++i)
+        for (uint32_t i{}; i != 16; ++i)
         {
             renderer_.draw(command_buffer,
                 static_cast<uint32_t>(lod_),
-                j * 33 + i,
+                j * 17 + i,
                 &vertex_buffer_,
                 glm::translate(center_model,
                     {cppext::as_fp(i) * center_distance,

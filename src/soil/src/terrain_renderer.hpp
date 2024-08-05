@@ -112,6 +112,7 @@ namespace soil
 
         uint32_t terrain_dimension_;
         uint32_t chunk_dimension_;
+        uint32_t chunks_per_dimension_;
 
         std::vector<lod_index_buffer> index_buffers_;
 

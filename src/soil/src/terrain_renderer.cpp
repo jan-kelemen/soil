@@ -36,8 +36,6 @@
 
 namespace
 {
-    constexpr uint32_t max_chunks{33 * 33};
-
     struct [[nodiscard]] camera_uniform final
     {
         glm::mat4 view;
@@ -55,6 +53,7 @@ namespace
         uint32_t chunk;
         uint32_t chunk_dimension;
         uint32_t terrain_dimension;
+        uint32_t chunks_per_dimension;
     };
 
     consteval auto binding_description()
@@ -211,6 +210,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
     , depth_buffer_{depth_buffer}
     , terrain_dimension_{terrain_dimension}
     , chunk_dimension_{chunk_dimension}
+    , chunks_per_dimension_{(terrain_dimension_ - 1) / (chunk_dimension_ - 1) +
+          1}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
 {
     auto const max_lod{static_cast<uint32_t>(round(log2(chunk_dimension))) + 1};
@@ -255,8 +256,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
         data.camera_uniform_map =
             vkrndr::map_memory(device, data.camera_uniform.allocation);
 
-        auto const chunk_uniform_buffer_size{
-            sizeof(chunk_uniform) * max_chunks};
+        auto const chunk_uniform_buffer_size{sizeof(chunk_uniform) *
+            chunks_per_dimension_ * chunks_per_dimension_};
         data.chunk_uniform = create_buffer(device_,
             chunk_uniform_buffer_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -376,7 +377,8 @@ void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
         push_constants const constants{.lod = lod,
             .chunk = chunk_index,
             .chunk_dimension = chunk_dimension_,
-            .terrain_dimension = terrain_dimension_};
+            .terrain_dimension = terrain_dimension_,
+            .chunks_per_dimension = chunks_per_dimension_};
 
         auto* const ch_uniform{
             frame_data_->chunk_uniform_map.as<chunk_uniform>()};

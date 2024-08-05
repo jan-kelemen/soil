@@ -1,12 +1,13 @@
 #version 460
 
-layout(location = 0) in uvec2 inPosition;
+layout(location = 0) in uvec2 inChunkPosition;
 
 layout(push_constant) uniform PushConsts {
     uint lod;
     uint chunk;
     uint chunkDimension;
     uint terrainDimension;
+    uint chunksPerDimension;
 } pushConsts;
 
 layout(binding = 0) uniform Camera {
@@ -27,23 +28,23 @@ layout(std430, binding = 2) readonly buffer Heightmap {
 } heightmap;
 
 layout(location = 0) out vec3 outColor;
-layout(location = 1) out vec4 vtxChk;
 
-uint vertToHeightmap(uint vertex_index) {
-    uint chunkY = pushConsts.chunk / 33;
-    uint chunkX = pushConsts.chunk % 33;
+uvec2 globalPosition() {
+    uint chunkY = pushConsts.chunk / pushConsts.chunksPerDimension;
+    uint chunkX = pushConsts.chunk % pushConsts.chunksPerDimension;
 
-    return (chunkY * (pushConsts.chunkDimension - 1) + inPosition.y) * pushConsts.terrainDimension + (chunkX * (pushConsts.chunkDimension - 1) + inPosition.x);
+    return uvec2(chunkX * (pushConsts.chunkDimension - 1) + inChunkPosition.x, chunkY * (pushConsts.chunkDimension - 1) + inChunkPosition.y);
 }
 
 void main() {
-    vec4 vertex = vec4(inPosition.x, heightmap.heights[vertToHeightmap(gl_VertexIndex)], inPosition.y, 1.0);
+    uvec2 globalPos = globalPosition();
+
+    vec4 vertex = vec4(inChunkPosition.x, heightmap.heights[globalPos.y * pushConsts.terrainDimension + globalPos.x], inChunkPosition.y, 1.0);
     mat4 model = chunks.chunks[pushConsts.chunk].model;
 
     vec4 worldPosition = model * vertex;
 
     gl_Position = camera.projection * camera.view * worldPosition;
     outColor = vec3(0.5, vertex.y / 255, 0.5);
-    vtxChk = vec4(inPosition.x, inPosition.y, pushConsts.chunk, vertToHeightmap(gl_VertexIndex));
 }
 
