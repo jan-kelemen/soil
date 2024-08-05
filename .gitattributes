@@ -3,3 +3,4 @@
 *.blend binary
 *.gltf text
 *.jpg binary
+*.png binary
