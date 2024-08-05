@@ -33,7 +33,7 @@ uint vertToHeightmap(uint vertex_index) {
     uint chunkY = pushConsts.chunk / 33;
     uint chunkX = pushConsts.chunk % 33;
 
-    return (chunkY * pushConsts.chunkDimension + inPosition.y) * pushConsts.terrainDimension + (chunkX * pushConsts.chunkDimension + inPosition.x);
+    return (chunkY * (pushConsts.chunkDimension - 1) + inPosition.y) * pushConsts.terrainDimension + (chunkX * (pushConsts.chunkDimension - 1) + inPosition.x);
 }
 
 void main() {

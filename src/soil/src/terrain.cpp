@@ -72,9 +72,9 @@ void soil::terrain::draw(VkImageView target_image,
         renderer_.begin_render_pass(target_image, command_buffer, render_area)};
 
     glm::mat4 const center_model{glm::scale(model_matrix, scaling)};
-    for (uint32_t j{}; j != 31; ++j)
+    for (uint32_t j{}; j != 32; ++j)
     {
-        for (uint32_t i{}; i != 31; ++i)
+        for (uint32_t i{}; i != 32; ++i)
         {
             renderer_.draw(command_buffer,
                 static_cast<uint32_t>(lod_),
