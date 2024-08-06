@@ -265,9 +265,6 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::load_texture(
         STBI_rgb_alpha)};
 
     auto const image_size{static_cast<VkDeviceSize>(width * height * 4)};
-    uint32_t const mip_levels{
-        static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) +
-        1};
 
     if (!pixels)
     {
@@ -281,7 +278,7 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::load_texture(
     vulkan_image rv{transfer_image(image_bytes,
         {cppext::narrow<uint32_t>(width), cppext::narrow<uint32_t>(height)},
         format,
-        mip_levels)};
+        max_mip_levels(width, height))};
 
     stbi_image_free(pixels);
 
@@ -304,6 +301,20 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
     memcpy(staging_map.mapped_memory, image_data.data(), image_data.size());
     unmap_memory(device_, &staging_map);
 
+    vulkan_image rv{
+        transfer_buffer_to_image(staging_buffer, extent, format, mip_levels)};
+
+    destroy(device_, &staging_buffer);
+
+    return rv;
+}
+
+vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_buffer_to_image(
+    vkrndr::vulkan_buffer const& source,
+    VkExtent2D const extent,
+    VkFormat const format,
+    uint32_t const mip_levels)
+{
     vulkan_image image{create_image_and_view(device_,
         extent,
         mip_levels,
@@ -325,7 +336,7 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
 
     wait_for_transfer_write(image.image, present_queue_buffer, mip_levels);
     copy_buffer_to_image(present_queue_buffer,
-        staging_buffer.buffer,
+        source.buffer,
         image.image,
         extent);
     if (mip_levels == 1)
@@ -348,8 +359,6 @@ vkrndr::vulkan_image vkrndr::vulkan_renderer::transfer_image(
         queue->queue,
         std::span{&present_queue_buffer, 1},
         frame_data_->present_command_pool);
-
-    destroy(device_, &staging_buffer);
 
     return image;
 }

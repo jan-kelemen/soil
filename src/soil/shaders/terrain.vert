@@ -27,7 +27,9 @@ layout(std430, binding = 2) readonly buffer Heightmap {
     float heights[];
 } heightmap;
 
-layout(location = 0) out vec3 outColor;
+layout(location = 0) out vec3 outFragPosition;
+layout(location = 1) out vec2 outGlobalUV;
+layout(location = 2) out vec2 outUV;
 
 uvec2 globalPosition() {
     uint chunkY = pushConsts.chunk / pushConsts.chunksPerDimension;
@@ -45,6 +47,8 @@ void main() {
     vec4 worldPosition = model * vertex;
 
     gl_Position = camera.projection * camera.view * worldPosition;
-    outColor = vec3(0.5, vertex.y / 255, 0.5);
+    outFragPosition = vec3(globalPos.x, vertex.y, globalPos.y);
+    outGlobalUV = vec2(float(globalPos.x) / pushConsts.terrainDimension, float(globalPos.y) / pushConsts.terrainDimension);
+    outUV = vec2(float(inChunkPosition.x) / (pushConsts.chunkDimension - 1), float(inChunkPosition.y) / (pushConsts.chunkDimension - 1));
 }
 

@@ -8,6 +8,7 @@ target_sources(soil
         ${CMAKE_CURRENT_SOURCE_DIR}/src/free_camera_controller.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/heightmap.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/mouse_controller.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/noise.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/perspective_camera.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/physics_engine.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/terrain.hpp
@@ -19,6 +20,7 @@ target_sources(soil
         ${CMAKE_CURRENT_SOURCE_DIR}/src/free_camera_controller.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/heightmap.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/mouse_controller.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/noise.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/perspective_camera.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/physics_engine.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/soil.m.cpp

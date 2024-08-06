@@ -75,6 +75,12 @@ namespace vkrndr
             VkFormat format,
             uint32_t mip_levels);
 
+        [[nodiscard]] vulkan_image transfer_buffer_to_image(
+            vkrndr::vulkan_buffer const& source,
+            VkExtent2D extent,
+            VkFormat format,
+            uint32_t mip_levels);
+
         void transfer_buffer(vulkan_buffer const& source,
             vulkan_buffer const& target);
 

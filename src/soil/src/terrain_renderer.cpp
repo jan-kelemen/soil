@@ -1,5 +1,6 @@
 #include <terrain_renderer.hpp>
 
+#include <noise.hpp>
 #include <perspective_camera.hpp>
 
 #include <cppext_cycled_buffer.hpp>
@@ -133,9 +134,23 @@ namespace
         heightmap_storage_binding.descriptorCount = 1;
         heightmap_storage_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+        VkDescriptorSetLayoutBinding textures_binding{};
+        textures_binding.binding = 3;
+        textures_binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        textures_binding.descriptorCount = 1;
+        textures_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutBinding texture_sampler_binding{};
+        texture_sampler_binding.binding = 4;
+        texture_sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+        texture_sampler_binding.descriptorCount = 1;
+        texture_sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
         std::array const bindings{camera_uniform_binding,
             chunk_uniform_binding,
-            heightmap_storage_binding};
+            heightmap_storage_binding,
+            textures_binding,
+            texture_sampler_binding};
 
         VkDescriptorSetLayoutCreateInfo layout_info{};
         layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -155,7 +170,9 @@ namespace
         VkDescriptorSet const& descriptor_set,
         VkDescriptorBufferInfo const camera_uniform_info,
         VkDescriptorBufferInfo const chunk_uniform_info,
-        VkDescriptorBufferInfo const heightmap_storage_info)
+        VkDescriptorBufferInfo const heightmap_storage_info,
+        std::span<VkDescriptorImageInfo const> const textures_info,
+        VkDescriptorImageInfo const texture_sampler_info)
     {
         VkWriteDescriptorSet camera_uniform_write{};
         camera_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -185,9 +202,30 @@ namespace
         heightmap_uniform_write.descriptorCount = 1;
         heightmap_uniform_write.pBufferInfo = &heightmap_storage_info;
 
+        VkWriteDescriptorSet textures_write{};
+        textures_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        textures_write.dstSet = descriptor_set;
+        textures_write.dstBinding = 3;
+        textures_write.dstArrayElement = 0;
+        textures_write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        textures_write.descriptorCount =
+            vkrndr::count_cast(textures_info.size());
+        textures_write.pImageInfo = textures_info.data();
+
+        VkWriteDescriptorSet texture_sampler_write{};
+        texture_sampler_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        texture_sampler_write.dstSet = descriptor_set;
+        texture_sampler_write.dstBinding = 4;
+        texture_sampler_write.dstArrayElement = 0;
+        texture_sampler_write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+        texture_sampler_write.descriptorCount = 1;
+        texture_sampler_write.pImageInfo = &texture_sampler_info;
+
         std::array const descriptor_writes{camera_uniform_write,
             chunk_uniform_write,
-            heightmap_uniform_write};
+            heightmap_uniform_write,
+            textures_write,
+            texture_sampler_write};
 
         vkUpdateDescriptorSets(device->logical,
             vkrndr::count_cast(descriptor_writes.size()),
@@ -212,6 +250,9 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
     , chunk_dimension_{chunk_dimension}
     , chunks_per_dimension_{(terrain_dimension_ - 1) / (chunk_dimension_ - 1) +
           1}
+    , texture_mix_image_{create_texture_mix_image()}
+    , texture_sampler_{create_texture_sampler(device_,
+          texture_mix_image_.mip_levels)}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
 {
     auto const max_lod{static_cast<uint32_t>(round(log2(chunk_dimension))) + 1};
@@ -273,6 +314,12 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
 
         DISABLE_WARNING_PUSH
         DISABLE_WARNING_MISSING_FIELD_INITIALIZERS
+        std::array const texture_info{
+            VkDescriptorImageInfo{.imageView = texture_mix_image_.view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
+
+        VkDescriptorImageInfo sampler_info{.sampler = texture_sampler_};
+        DISABLE_WARNING_POP
 
         bind_descriptor_set(device_,
             data.descriptor_set,
@@ -284,9 +331,9 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
                 .range = chunk_uniform_buffer_size},
             VkDescriptorBufferInfo{.buffer = heightmap_buffer->buffer,
                 .offset = 0,
-                .range = heightmap_buffer->size});
-
-        DISABLE_WARNING_POP
+                .range = heightmap_buffer->size},
+            texture_info,
+            sampler_info);
     }
 }
 
@@ -317,6 +364,10 @@ soil::terrain_renderer::~terrain_renderer()
     {
         destroy(device_, &index_buffer.index_buffer);
     }
+
+    vkDestroySampler(device_->logical, texture_sampler_, nullptr);
+
+    destroy(device_, &texture_mix_image_);
 }
 
 void soil::terrain_renderer::update(soil::perspective_camera const& camera)
@@ -411,6 +462,28 @@ void soil::terrain_renderer::end_render_pass()
 }
 
 void soil::terrain_renderer::draw_imgui() { ImGui::ShowMetricsWindow(); }
+
+vkrndr::vulkan_image soil::terrain_renderer::create_texture_mix_image()
+{
+    auto staging_buffer{vkrndr::create_buffer(device_,
+        terrain_dimension_ * terrain_dimension_,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+    auto staging_map{map_memory(device_, staging_buffer.allocation)};
+    generate_2d_noise(
+        std::span{staging_map.as<std::byte>(), staging_buffer.size},
+        terrain_dimension_);
+    unmap_memory(device_, &staging_map);
+
+    auto rv{renderer_->transfer_buffer_to_image(staging_buffer,
+        VkExtent2D{terrain_dimension_, terrain_dimension_},
+        VK_FORMAT_R8_UNORM,
+        vkrndr::max_mip_levels(terrain_dimension_, terrain_dimension_))};
+    destroy(device_, &staging_buffer);
+
+    return rv;
+}
 
 void soil::terrain_renderer::fill_index_buffer(uint32_t const dimension,
     uint32_t const lod)

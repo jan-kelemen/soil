@@ -102,6 +102,8 @@ namespace soil
         };
 
     private:
+        [[nodiscard]] vkrndr::vulkan_image create_texture_mix_image();
+
         void fill_index_buffer(uint32_t dimension, uint32_t lod);
 
     private:
@@ -113,6 +115,9 @@ namespace soil
         uint32_t terrain_dimension_;
         uint32_t chunk_dimension_;
         uint32_t chunks_per_dimension_;
+
+        vkrndr::vulkan_image texture_mix_image_;
+        VkSampler texture_sampler_;
 
         std::vector<lod_index_buffer> index_buffers_;
 

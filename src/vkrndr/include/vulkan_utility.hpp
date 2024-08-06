@@ -5,6 +5,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -41,6 +42,13 @@ namespace vkrndr
             elements.value_or(value.size()) * sizeof(T)};
     }
 
+    template<typename T>
+    [[nodiscard]] uint32_t max_mip_levels(T const width, T const height)
+    {
+        return static_cast<uint32_t>(
+                   std::floor(std::log2(std::max(width, height)))) +
+            1;
+    }
 } // namespace vkrndr
 
 #endif // !VKRNDR_VULKAN_UTILITY_INCLUDED
