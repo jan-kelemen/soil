@@ -4,6 +4,7 @@
 #include <glm/vec3.hpp>
 
 #include <cstddef>
+#include <filesystem>
 #include <memory>
 #include <span>
 #include <vector>
@@ -15,7 +16,7 @@ namespace soil
     class [[nodiscard]] heightmap final
     {
     public:
-        explicit heightmap(size_t dimension);
+        explicit heightmap(std::filesystem::path const& path);
 
         heightmap(heightmap const&) = default;
 
@@ -26,8 +27,6 @@ namespace soil
 
     public:
         [[nodiscard]] size_t dimension() const;
-
-        [[nodiscard]] glm::vec3 const& scaling() const;
 
         // cppcheck-suppress returnByReference
         [[nodiscard]] std::span<float const> data() const;
@@ -46,7 +45,6 @@ namespace soil
 
     private:
         size_t dimension_;
-        glm::vec3 scaling_;
         std::vector<float> data_;
     };
 } // namespace soil

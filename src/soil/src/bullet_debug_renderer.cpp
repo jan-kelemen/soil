@@ -37,7 +37,7 @@
 
 namespace
 {
-    constexpr uint32_t max_vertex_count{10000};
+    constexpr uint32_t max_vertex_count{1000000};
 
     DISABLE_WARNING_PUSH
     DISABLE_WARNING_STRUCTURE_WAS_PADDED_DUE_TO_ALIGNMENT_SPECIFIER

@@ -7,41 +7,43 @@
 #include <BulletCollision/CollisionShapes/btCollisionShape.h> // IWYU pragma: keep
 #include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
 
-#include <PerlinNoise.hpp>
+#include <stb_image.h>
 
+#include <cassert>
 #include <memory>
 
 // IWYU pragma: no_include <BulletCollision/CollisionShapes/btConcaveShape.h>
 
-soil::heightmap::heightmap(size_t dimension)
-    : dimension_{dimension}
-    , scaling_{1.0f, 5.0f, 1.0f}
+soil::heightmap::heightmap(std::filesystem::path const& path)
 {
+    int width; // NOLINT
+    int height; // NOLINT
+    int channels; // NOLINT
+    stbi_uc* const pixels{stbi_load(path.generic_string().c_str(),
+        &width,
+        &height,
+        &channels,
+        STBI_grey)};
+
+    assert(width == height);
+    assert(pixels);
+
+    dimension_ = cppext::narrow<size_t>(width);
     data_.reserve(dimension_ * dimension_);
 
-    constexpr siv::PerlinNoise::seed_type seed{123456u};
+    static constexpr auto max_value{
+        cppext::as_fp(std::numeric_limits<uint8_t>::max())};
 
-    siv::BasicPerlinNoise<float> const perlin{seed};
-    for (size_t y{}; y != dimension_; ++y)
+    for (auto point :
+        std::span{reinterpret_cast<uint8_t*>(pixels), dimension_ * dimension_})
     {
-        for (size_t x{}; x != dimension_; ++x)
-        {
-            if (y != dimension_ / 2 || x != dimension_ / 2)
-            {
-                data_.push_back(
-                    perlin.noise2D_01(cppext::as_fp(x), cppext::as_fp(y)));
-            }
-            else
-            {
-                data_.push_back(0.0f);
-            }
-        }
+        data_.push_back(cppext::as_fp(point));
     }
+
+    stbi_image_free(pixels);
 }
 
 size_t soil::heightmap::dimension() const { return dimension_; }
-
-glm::vec3 const& soil::heightmap::scaling() const { return scaling_; }
 
 std::span<float const> soil::heightmap::data() const { return data_; }
 
@@ -49,15 +51,12 @@ std::unique_ptr<btCollisionShape> soil::heightmap::collision_shape() const
 {
     auto heightfield_shape{std::make_unique<btHeightfieldTerrainShape>(
         cppext::narrow<int>(dimension_),
-        cppext::narrow<int>(dimension_),
+        100,
         data_.data(),
-        1.0f,
         0.0f,
-        1.0f,
+        cppext::as_fp(std::numeric_limits<uint8_t>::max()),
         1,
-        PHY_FLOAT,
         false)};
-    heightfield_shape->setLocalScaling(soil::to_bullet(scaling_));
 
     return heightfield_shape;
 }

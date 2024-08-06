@@ -46,6 +46,8 @@ soil::application::application(bool const debug)
     , camera_controller_{&camera_, &mouse_}
     , mouse_controller_{&mouse_, &camera_, &physics_}
 {
+    vulkan_renderer()->imgui_layer(true);
+
     fixed_update_interval(1.0f / 60.0f);
 
     camera_.resize({512, 512});
@@ -88,18 +90,19 @@ void soil::application::on_startup()
     physics_.set_gravity({0.0f, -9.81f, 0.0f});
     // Add heightfield
     {
-        heightmap_ = std::make_unique<heightmap>(17);
+        heightmap_ = std::make_unique<heightmap>("heightmap.png");
 
         btTransform transform;
         transform.setIdentity();
-        transform.setOrigin({-0.0f, 0.0f, -0.0f});
+        transform.setOrigin({0.0f, 0.0f, 0.0f});
         auto* const heightfield{
             physics_.add_rigid_body(heightmap_->collision_shape(),
                 0.0f,
                 transform)};
         heightfield->setUserIndex(2);
 
-        terrain_ = std::make_unique<terrain>(this->vulkan_device(),
+        terrain_ = std::make_unique<terrain>(*heightmap_,
+            this->vulkan_device(),
             this->vulkan_renderer(),
             &color_image_,
             &depth_buffer_);
