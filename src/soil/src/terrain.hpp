@@ -5,6 +5,8 @@
 
 #include <vulkan_buffer.hpp>
 
+#include <entt/entt.hpp>
+
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
@@ -19,6 +21,7 @@ namespace vkrndr
 namespace soil
 {
     class heightmap;
+    class physics_engine;
     class perspective_camera;
 } // namespace soil
 
@@ -28,6 +31,7 @@ namespace soil
     {
     public:
         terrain(heightmap const& heightmap,
+            physics_engine* physics_engine,
             vkrndr::vulkan_device* device,
             vkrndr::vulkan_renderer* renderer,
             vkrndr::vulkan_image* color_image,
@@ -59,7 +63,10 @@ namespace soil
             vkrndr::vulkan_renderer* renderer);
 
     private:
+        physics_engine* physics_engine_;
         vkrndr::vulkan_device* device_;
+
+        entt::registry chunk_registry_;
 
         uint32_t terrain_dimension_;
         uint32_t chunk_dimension_;

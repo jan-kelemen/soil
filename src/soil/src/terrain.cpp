@@ -1,6 +1,7 @@
 #include <terrain.hpp>
 
 #include <heightmap.hpp>
+#include <physics_engine.hpp>
 #include <terrain_renderer.hpp>
 
 #include <cppext_numeric.hpp>
@@ -8,6 +9,12 @@
 #include <vulkan_buffer.hpp>
 #include <vulkan_memory.hpp>
 #include <vulkan_renderer.hpp>
+
+#include <BulletCollision/CollisionShapes/btCollisionShape.h> // IWYU pragma: keep
+#include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
+#include <BulletDynamics/Dynamics/btRigidBody.h>
+#include <LinearMath/btTransform.h>
+#include <LinearMath/btVector3.h>
 
 #include <imgui.h>
 
@@ -17,14 +24,128 @@
 
 #include <cassert>
 #include <cstring>
+#include <limits>
+#include <memory>
+#include <ranges>
 #include <span>
+#include <utility>
+#include <vector>
+
+namespace
+{
+    struct [[nodiscard]] chunk_component final
+    {
+        uint32_t chunk_index;
+        glm::vec3 chunk_offset;
+    };
+
+    struct [[nodiscard]] physics_component final
+    {
+        std::vector<float> heights;
+        btRigidBody* rigid_body{nullptr};
+    };
+
+    [[nodiscard]] std::pair<size_t, size_t> global_position(size_t const x,
+        size_t const y,
+        size_t const chunk,
+        size_t const chunk_dimension,
+        size_t const chunks_per_dimension)
+    {
+        auto const chunk_y{chunk / chunks_per_dimension};
+        auto const chunk_x{chunk % chunks_per_dimension};
+
+        return {chunk_x * (chunk_dimension - 1) + x,
+            chunk_y * (chunk_dimension - 1) + y};
+    }
+
+    void generate_chunks(entt::registry& registry,
+        soil::physics_engine& physics_engine,
+        soil::heightmap const& heightmap,
+        size_t terrain_dimension,
+        size_t const chunk_dimension)
+    {
+        auto const chunks_per_dimension{
+            (terrain_dimension - 1) / (chunk_dimension - 1) + 1};
+        auto const center_distance{cppext::as_fp(chunk_dimension - 1)};
+        auto const center_offset{center_distance / 2.0f};
+
+        auto generate_chunk =
+            [&](size_t const chunk_x, size_t const chunk_y) mutable
+        {
+            auto const id{registry.create()};
+
+            auto const offset_x{cppext::as_fp(chunk_x) * center_distance};
+            auto const offset_y{cppext::as_fp(chunk_y) * center_distance};
+            auto const& chunk{registry.emplace<chunk_component>(id,
+                cppext::narrow<uint32_t>(
+                    chunk_y * chunks_per_dimension + chunk_x),
+                glm::vec3{-center_offset + offset_x,
+                    -127.5f,
+                    -center_offset + offset_y})};
+
+            // Skip adding physics to chunks which are not on diagonal
+            if (chunk_x != chunk_y)
+            {
+                return;
+            }
+
+            std::vector<float> heights;
+            heights.reserve(chunk_dimension * chunk_dimension);
+            for (size_t j{}; j != chunk_dimension; ++j)
+            {
+                for (size_t i{}; i != chunk_dimension; ++i)
+                {
+                    auto const& [x, y] = global_position(i,
+                        j,
+                        chunk.chunk_index,
+                        chunk_dimension,
+                        chunks_per_dimension);
+                    heights.push_back(heightmap.value(x, y));
+                }
+            }
+
+            auto& component{registry.emplace<physics_component>(id,
+                std::move(heights),
+                nullptr)};
+
+            auto heightfield_shape{std::make_unique<btHeightfieldTerrainShape>(
+                cppext::narrow<int>(chunk_dimension),
+                cppext::narrow<int>(chunk_dimension),
+                component.heights.data(),
+                0.0f,
+                cppext::as_fp(std::numeric_limits<uint8_t>::max()),
+                1,
+                false)};
+
+            btTransform transform;
+            transform.setIdentity();
+            transform.setOrigin({offset_x, 0.0f, offset_y});
+            component.rigid_body =
+                physics_engine.add_rigid_body(std::move(heightfield_shape),
+                    0.0f,
+                    transform);
+            component.rigid_body->setUserIndex(
+                cppext::narrow<int>(chunk.chunk_index));
+        };
+
+        for (auto y : std::views::iota(size_t{0}, chunks_per_dimension - 1))
+        {
+            for (auto x : std::views::iota(size_t{0}, chunks_per_dimension - 1))
+            {
+                generate_chunk(x, y);
+            }
+        }
+    }
+} // namespace
 
 soil::terrain::terrain(heightmap const& heightmap,
+    physics_engine* const physics_engine,
     vkrndr::vulkan_device* device,
     vkrndr::vulkan_renderer* renderer,
     vkrndr::vulkan_image* color_image,
     vkrndr::vulkan_image* depth_buffer)
-    : device_{device}
+    : physics_engine_{physics_engine}
+    , device_{device}
     , terrain_dimension_{cppext::narrow<uint32_t>(heightmap.dimension())}
     , chunk_dimension_{65}
     , heightmap_buffer_{create_buffer(device,
@@ -41,6 +162,12 @@ soil::terrain::terrain(heightmap const& heightmap,
 
 {
     fill_heightmap(heightmap, renderer);
+
+    generate_chunks(chunk_registry_,
+        *physics_engine_,
+        heightmap,
+        terrain_dimension_,
+        chunk_dimension_);
 }
 
 soil::terrain::~terrain() { destroy(device_, &heightmap_buffer_); }
@@ -55,29 +182,16 @@ void soil::terrain::draw(VkImageView target_image,
     VkCommandBuffer command_buffer,
     VkRect2D render_area)
 {
-    float const center_distance{cppext::as_fp(chunk_dimension_ - 1)};
-    float const center_offset{cppext::as_fp(terrain_dimension_ - 1) / 2.0f};
-
-    // Heightmap values range from [0, 255], bullet recenters it to [-127.5,
-    // 127.5]
-    glm::vec3 const offset{center_offset, 127.5f, 49.5f}; // t00ning
-
     auto const guard{
         renderer_.begin_render_pass(target_image, command_buffer, render_area)};
 
-    glm::mat4 const model_matrix{glm::translate(glm::mat4{1.0f}, -offset)};
-    for (uint32_t j{}; j != 16; ++j)
+    for (auto entity : chunk_registry_.view<chunk_component>())
     {
-        for (uint32_t i{}; i != 16; ++i)
-        {
-            renderer_.draw(command_buffer,
-                static_cast<uint32_t>(lod_),
-                j * 17 + i,
-                glm::translate(model_matrix,
-                    {cppext::as_fp(i) * center_distance,
-                        0.0f,
-                        cppext::as_fp(j) * center_distance}));
-        }
+        auto const& chunk_comp{chunk_registry_.get<chunk_component>(entity)};
+        renderer_.draw(command_buffer,
+            static_cast<uint32_t>(lod_),
+            chunk_comp.chunk_index,
+            glm::translate(glm::mat4{1.0f}, chunk_comp.chunk_offset));
     }
 
     renderer_.end_render_pass();

@@ -18,13 +18,6 @@
 #include <vulkan_image.hpp>
 #include <vulkan_renderer.hpp>
 
-#include <BulletCollision/CollisionShapes/btBoxShape.h>
-#include <BulletCollision/CollisionShapes/btCollisionShape.h>
-
-#include <BulletDynamics/Dynamics/btRigidBody.h>
-#include <LinearMath/btTransform.h>
-#include <LinearMath/btVector3.h>
-
 #include <SDL_events.h>
 #include <SDL_video.h>
 
@@ -92,33 +85,12 @@ void soil::application::on_startup()
     {
         heightmap_ = std::make_unique<heightmap>("heightmap.png");
 
-        btTransform transform;
-        transform.setIdentity();
-        transform.setOrigin({0.0f, 0.0f, 0.0f});
-        auto* const heightfield{
-            physics_.add_rigid_body(heightmap_->collision_shape(),
-                0.0f,
-                transform)};
-        heightfield->setUserIndex(2);
-
         terrain_ = std::make_unique<terrain>(*heightmap_,
+            &physics_,
             this->vulkan_device(),
             this->vulkan_renderer(),
             &color_image_,
             &depth_buffer_);
-    }
-
-    // Add static cube
-    {
-        btTransform transform;
-        transform.setIdentity();
-        transform.setOrigin({0.0f, 10.0f, 0.0f});
-
-        auto* const cube{physics_.add_rigid_body(
-            std::make_unique<btBoxShape>(btVector3{0.5f, 0.5f, 0.5f}),
-            0.1f,
-            transform)};
-        cube->setUserIndex(0);
     }
 
     physics_.attach_renderer(this->vulkan_device(),

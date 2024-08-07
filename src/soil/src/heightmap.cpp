@@ -2,17 +2,10 @@
 
 #include <cppext_numeric.hpp>
 
-#include <BulletCollision/CollisionShapes/btCollisionShape.h> // IWYU pragma: keep
-#include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
-
 #include <stb_image.h>
 
 #include <cassert>
 #include <cstdint>
-#include <limits>
-#include <memory>
-
-// IWYU pragma: no_include <BulletCollision/CollisionShapes/btConcaveShape.h>
 
 soil::heightmap::heightmap(std::filesystem::path const& path)
 {
@@ -45,17 +38,3 @@ soil::heightmap::heightmap(std::filesystem::path const& path)
 size_t soil::heightmap::dimension() const { return dimension_; }
 
 std::span<float const> soil::heightmap::data() const { return data_; }
-
-std::unique_ptr<btCollisionShape> soil::heightmap::collision_shape() const
-{
-    auto heightfield_shape{std::make_unique<btHeightfieldTerrainShape>(
-        cppext::narrow<int>(dimension_),
-        100,
-        data_.data(),
-        0.0f,
-        cppext::as_fp(std::numeric_limits<uint8_t>::max()),
-        1,
-        false)};
-
-    return heightfield_shape;
-}

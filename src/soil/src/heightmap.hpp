@@ -3,11 +3,8 @@
 
 #include <cstddef>
 #include <filesystem>
-#include <memory>
 #include <span>
 #include <vector>
-
-class btCollisionShape;
 
 namespace soil
 {
@@ -33,8 +30,6 @@ namespace soil
         {
             return data_[y * dimension_ + x];
         }
-
-        [[nodiscard]] std::unique_ptr<btCollisionShape> collision_shape() const;
 
     private:
         heightmap& operator=(heightmap const&) = default;
