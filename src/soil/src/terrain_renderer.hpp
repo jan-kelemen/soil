@@ -2,6 +2,7 @@
 #define SOIL_TERRAIN_RENDERER_INCLUDED
 
 #include <cppext_cycled_buffer.hpp>
+#include <cppext_numeric.hpp>
 
 #include <vkrndr_render_pass.hpp>
 #include <vulkan_buffer.hpp>
@@ -43,7 +44,7 @@ namespace soil
             vkrndr::vulkan_renderer* renderer,
             vkrndr::vulkan_image* color_image,
             vkrndr::vulkan_image* depth_buffer,
-            vkrndr::vulkan_buffer* heightmap_buffer,
+            vkrndr::vulkan_buffer const* heightmap_buffer,
             uint32_t terrain_dimension,
             uint32_t chunk_dimension);
 
@@ -57,7 +58,7 @@ namespace soil
     public:
         [[nodiscard]] int lod_levels() const
         {
-            return index_buffers_.back().lod;
+            return cppext::narrow<int>(index_buffers_.back().lod);
         }
 
         void update(soil::perspective_camera const& camera);
@@ -69,7 +70,6 @@ namespace soil
         void draw(VkCommandBuffer command_buffer,
             uint32_t lod,
             uint32_t chunk_index,
-            vkrndr::vulkan_buffer* vertex_buffer,
             glm::mat4 const& model);
 
         void end_render_pass();
@@ -89,20 +89,19 @@ namespace soil
             vkrndr::vulkan_buffer chunk_uniform;
             vkrndr::mapped_memory chunk_uniform_map{};
             VkDescriptorSet descriptor_set{VK_NULL_HANDLE};
-
-            vkrndr::vulkan_buffer* last_bound_vertex_buffer{};
-            uint32_t current_chunk_;
         };
 
         struct [[nodiscard]] lod_index_buffer final
         {
-            uint32_t lod;
-            uint32_t index_count;
+            uint32_t lod{};
+            uint32_t index_count{};
             vkrndr::vulkan_buffer index_buffer;
         };
 
     private:
         [[nodiscard]] vkrndr::vulkan_image create_texture_mix_image();
+
+        void fill_vertex_buffer();
 
         void fill_index_buffer(uint32_t dimension, uint32_t lod);
 
@@ -118,6 +117,9 @@ namespace soil
 
         vkrndr::vulkan_image texture_mix_image_;
         VkSampler texture_sampler_;
+
+        uint32_t vertex_count_{};
+        vkrndr::vulkan_buffer vertex_buffer_;
 
         std::vector<lod_index_buffer> index_buffers_;
 

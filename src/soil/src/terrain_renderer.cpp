@@ -17,18 +17,14 @@
 #include <vulkan_renderer.hpp>
 #include <vulkan_utility.hpp>
 
-#include <glm/geometric.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/mat4x4.hpp>
-#include <glm/matrix.hpp>
-#include <glm/vec2.hpp>
-#include <glm/vec3.hpp>
 
 #include <imgui.h>
 
-#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
+#include <iterator>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -239,7 +235,7 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
     vkrndr::vulkan_renderer* const renderer,
     vkrndr::vulkan_image* const color_image,
     vkrndr::vulkan_image* const depth_buffer,
-    vkrndr::vulkan_buffer* const heightmap_buffer,
+    vkrndr::vulkan_buffer const* const heightmap_buffer,
     uint32_t const terrain_dimension,
     uint32_t const chunk_dimension)
     : device_{device}
@@ -253,8 +249,15 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
     , texture_mix_image_{create_texture_mix_image()}
     , texture_sampler_{create_texture_sampler(device_,
           texture_mix_image_.mip_levels)}
+    , vertex_count_{chunk_dimension_ * chunk_dimension_}
+    , vertex_buffer_{create_buffer(device,
+          vertex_count_ * sizeof(terrain_vertex),
+          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
 {
+    fill_vertex_buffer();
+
     auto const max_lod{static_cast<uint32_t>(round(log2(chunk_dimension))) + 1};
     for (uint32_t i{}; i != max_lod; ++i)
     {
@@ -318,7 +321,7 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
             VkDescriptorImageInfo{.imageView = texture_mix_image_.view,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
-        VkDescriptorImageInfo sampler_info{.sampler = texture_sampler_};
+        VkDescriptorImageInfo const sampler_info{.sampler = texture_sampler_};
         DISABLE_WARNING_POP
 
         bind_descriptor_set(device_,
@@ -365,6 +368,8 @@ soil::terrain_renderer::~terrain_renderer()
         destroy(device_, &index_buffer.index_buffer);
     }
 
+    destroy(device_, &vertex_buffer_);
+
     vkDestroySampler(device_->logical, texture_sampler_, nullptr);
 
     destroy(device_, &texture_mix_image_);
@@ -402,26 +407,20 @@ vkrndr::render_pass_guard soil::terrain_renderer::begin_render_pass(
         0,
         std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
 
+    VkDeviceSize const zero_offset{0};
+    vkCmdBindVertexBuffers(command_buffer,
+        0,
+        1,
+        &vertex_buffer_.buffer,
+        &zero_offset);
     return guard;
 }
 
 void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
     uint32_t const lod,
     uint32_t const chunk_index,
-    vkrndr::vulkan_buffer* const vertex_buffer,
     glm::mat4 const& model)
 {
-    if (frame_data_->last_bound_vertex_buffer != vertex_buffer)
-    {
-        VkDeviceSize const zero_offset{0};
-        vkCmdBindVertexBuffers(command_buffer,
-            0,
-            1,
-            &vertex_buffer->buffer,
-            &zero_offset);
-        frame_data_->last_bound_vertex_buffer = vertex_buffer;
-    }
-
     if (auto it{std::ranges::find(index_buffers_, lod, &lod_index_buffer::lod)};
         it != std::cend(index_buffers_))
     {
@@ -451,22 +450,14 @@ void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
     }
 }
 
-void soil::terrain_renderer::end_render_pass()
-{
-    frame_data_.cycle(
-        [](frame_resources& current, frame_resources const&)
-        {
-            current.last_bound_vertex_buffer = nullptr;
-            current.current_chunk_ = 0;
-        });
-}
+void soil::terrain_renderer::end_render_pass() { frame_data_.cycle(); }
 
 void soil::terrain_renderer::draw_imgui() { ImGui::ShowMetricsWindow(); }
 
 vkrndr::vulkan_image soil::terrain_renderer::create_texture_mix_image()
 {
     auto staging_buffer{vkrndr::create_buffer(device_,
-        terrain_dimension_ * terrain_dimension_,
+        VkDeviceSize{terrain_dimension_} * terrain_dimension_,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
@@ -483,6 +474,32 @@ vkrndr::vulkan_image soil::terrain_renderer::create_texture_mix_image()
     destroy(device_, &staging_buffer);
 
     return rv;
+}
+
+void soil::terrain_renderer::fill_vertex_buffer()
+{
+    vkrndr::vulkan_buffer staging_buffer{vkrndr::create_buffer(device_,
+        vertex_count_ * sizeof(terrain_vertex),
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+
+    vkrndr::mapped_memory staging_map{
+        vkrndr::map_memory(device_, staging_buffer.allocation)};
+
+    auto* const vertices{staging_map.as<terrain_vertex>()};
+    for (uint32_t z{}; z != chunk_dimension_; ++z)
+    {
+        for (uint32_t x{}; x != chunk_dimension_; ++x)
+        {
+            vertices[z * chunk_dimension_ + x] = {.position = {x, z}};
+        }
+    }
+
+    renderer_->transfer_buffer(staging_buffer, vertex_buffer_);
+
+    unmap_memory(device_, &staging_map);
+    destroy(device_, &staging_buffer);
 }
 
 void soil::terrain_renderer::fill_index_buffer(uint32_t const dimension,
@@ -523,7 +540,7 @@ void soil::terrain_renderer::fill_index_buffer(uint32_t const dimension,
         }
     }
 
-    vkrndr::vulkan_buffer lod_buffer{create_buffer(device_,
+    vkrndr::vulkan_buffer const lod_buffer{create_buffer(device_,
         lod_index_count * sizeof(uint32_t),
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)};

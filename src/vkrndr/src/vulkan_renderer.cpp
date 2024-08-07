@@ -21,9 +21,7 @@
 
 #include <stb_image.h>
 
-#include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstring>
 #include <span>
 #include <stdexcept>

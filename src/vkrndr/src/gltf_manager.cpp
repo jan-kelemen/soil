@@ -21,7 +21,6 @@
 #include <vulkan/vulkan_core.h>
 
 #include <algorithm>
-#include <cmath>
 #include <cstddef>
 #include <iterator>
 #include <stdexcept>

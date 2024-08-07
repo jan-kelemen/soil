@@ -22,9 +22,9 @@ void soil::generate_2d_noise(std::span<std::byte> output,
         for (size_t i{}; i != dimension; ++i)
         {
             output[j * dimension + i] = static_cast<std::byte>(
-                round(perlin.noise2D_01(cppext::as_fp(i) / div_factor,
-                          cppext::as_fp(j) / div_factor) *
-                    255));
+                roundf(perlin.noise2D_01(cppext::as_fp(i) / div_factor,
+                           cppext::as_fp(j) / div_factor) *
+                    255.0f));
         }
     }
 }

@@ -1,6 +1,9 @@
 #include <terrain.hpp>
 
 #include <heightmap.hpp>
+#include <terrain_renderer.hpp>
+
+#include <cppext_numeric.hpp>
 
 #include <vulkan_buffer.hpp>
 #include <vulkan_memory.hpp>
@@ -8,7 +11,13 @@
 
 #include <imgui.h>
 
-#include <array>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
+
+#include <cassert>
+#include <cstring>
+#include <span>
 
 soil::terrain::terrain(heightmap const& heightmap,
     vkrndr::vulkan_device* device,
@@ -18,11 +27,6 @@ soil::terrain::terrain(heightmap const& heightmap,
     : device_{device}
     , terrain_dimension_{cppext::narrow<uint32_t>(heightmap.dimension())}
     , chunk_dimension_{65}
-    , vertex_count_{chunk_dimension_ * chunk_dimension_}
-    , vertex_buffer_{create_buffer(device,
-          vertex_count_ * sizeof(terrain_vertex),
-          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)}
     , heightmap_buffer_{create_buffer(device,
           heightmap.dimension() * heightmap.dimension() * sizeof(float),
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -37,14 +41,9 @@ soil::terrain::terrain(heightmap const& heightmap,
 
 {
     fill_heightmap(heightmap, renderer);
-    fill_vertex_buffer(renderer);
 }
 
-soil::terrain::~terrain()
-{
-    destroy(device_, &heightmap_buffer_);
-    destroy(device_, &vertex_buffer_);
-}
+soil::terrain::~terrain() { destroy(device_, &heightmap_buffer_); }
 
 void soil::terrain::update(soil::perspective_camera const& camera,
     [[maybe_unused]] float delta_time)
@@ -61,14 +60,12 @@ void soil::terrain::draw(VkImageView target_image,
 
     // Heightmap values range from [0, 255], bullet recenters it to [-127.5,
     // 127.5]
-    glm::vec3 offset{center_offset, 127.5f, 49.5f}; // t00ning
-
-    glm::mat4 model_matrix{1.0f};
+    glm::vec3 const offset{center_offset, 127.5f, 49.5f}; // t00ning
 
     auto const guard{
         renderer_.begin_render_pass(target_image, command_buffer, render_area)};
 
-    glm::mat4 const center_model{glm::translate(model_matrix, -offset)};
+    glm::mat4 const model_matrix{glm::translate(glm::mat4{1.0f}, -offset)};
     for (uint32_t j{}; j != 16; ++j)
     {
         for (uint32_t i{}; i != 16; ++i)
@@ -76,8 +73,7 @@ void soil::terrain::draw(VkImageView target_image,
             renderer_.draw(command_buffer,
                 static_cast<uint32_t>(lod_),
                 j * 17 + i,
-                &vertex_buffer_,
-                glm::translate(center_model,
+                glm::translate(model_matrix,
                     {cppext::as_fp(i) * center_distance,
                         0.0f,
                         cppext::as_fp(j) * center_distance}));
@@ -115,31 +111,5 @@ void soil::terrain::fill_heightmap(heightmap const& heightmap,
 
     renderer->transfer_buffer(staging_buffer, heightmap_buffer_);
 
-    destroy(device_, &staging_buffer);
-}
-
-void soil::terrain::fill_vertex_buffer(vkrndr::vulkan_renderer* const renderer)
-{
-    vkrndr::vulkan_buffer staging_buffer{vkrndr::create_buffer(device_,
-        vertex_count_ * sizeof(terrain_vertex),
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
-
-    vkrndr::mapped_memory staging_map{
-        vkrndr::map_memory(device_, staging_buffer.allocation)};
-
-    auto* const vertices{staging_map.as<terrain_vertex>()};
-    for (uint32_t z{}; z != chunk_dimension_; ++z)
-    {
-        for (uint32_t x{}; x != chunk_dimension_; ++x)
-        {
-            vertices[z * chunk_dimension_ + x] = {.position = {x, z}};
-        }
-    }
-
-    renderer->transfer_buffer(staging_buffer, vertex_buffer_);
-
-    unmap_memory(device_, &staging_map);
     destroy(device_, &staging_buffer);
 }

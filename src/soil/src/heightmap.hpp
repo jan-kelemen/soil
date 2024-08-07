@@ -1,8 +1,6 @@
 #ifndef SOIL_HEIGHTMAP_INCLUDED
 #define SOIL_HEIGHTMAP_INCLUDED
 
-#include <glm/vec3.hpp>
-
 #include <cstddef>
 #include <filesystem>
 #include <memory>

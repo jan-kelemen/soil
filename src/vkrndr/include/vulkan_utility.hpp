@@ -5,6 +5,7 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <algorithm> // IWYU pragma: keep
 #include <cmath>
 #include <cstddef>
 #include <cstdint>

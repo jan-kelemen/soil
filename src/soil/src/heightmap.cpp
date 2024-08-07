@@ -1,7 +1,5 @@
 #include <heightmap.hpp>
 
-#include <bullet_adapter.hpp>
-
 #include <cppext_numeric.hpp>
 
 #include <BulletCollision/CollisionShapes/btCollisionShape.h> // IWYU pragma: keep
@@ -10,6 +8,8 @@
 #include <stb_image.h>
 
 #include <cassert>
+#include <cstdint>
+#include <limits>
 #include <memory>
 
 // IWYU pragma: no_include <BulletCollision/CollisionShapes/btConcaveShape.h>
@@ -31,14 +31,13 @@ soil::heightmap::heightmap(std::filesystem::path const& path)
     dimension_ = cppext::narrow<size_t>(width);
     data_.reserve(dimension_ * dimension_);
 
-    static constexpr auto max_value{
-        cppext::as_fp(std::numeric_limits<uint8_t>::max())};
-
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
     for (auto point :
         std::span{reinterpret_cast<uint8_t*>(pixels), dimension_ * dimension_})
     {
         data_.push_back(cppext::as_fp(point));
     }
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 
     stbi_image_free(pixels);
 }

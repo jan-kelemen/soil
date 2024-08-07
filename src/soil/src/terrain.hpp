@@ -8,8 +8,6 @@
 #include <vulkan/vulkan_core.h>
 
 #include <cstdint>
-#include <map>
-#include <memory>
 
 namespace vkrndr
 {
@@ -60,16 +58,11 @@ namespace soil
         void fill_heightmap(heightmap const& heightmap,
             vkrndr::vulkan_renderer* renderer);
 
-        void fill_vertex_buffer(vkrndr::vulkan_renderer* renderer);
-
     private:
         vkrndr::vulkan_device* device_;
 
         uint32_t terrain_dimension_;
         uint32_t chunk_dimension_;
-
-        uint32_t vertex_count_{};
-        vkrndr::vulkan_buffer vertex_buffer_;
 
         vkrndr::vulkan_buffer heightmap_buffer_;
 
