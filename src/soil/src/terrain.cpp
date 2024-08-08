@@ -148,21 +148,15 @@ soil::terrain::terrain(heightmap const& heightmap,
     , device_{device}
     , terrain_dimension_{cppext::narrow<uint32_t>(heightmap.dimension())}
     , chunk_dimension_{65}
-    , heightmap_buffer_{create_buffer(device,
-          heightmap.dimension() * heightmap.dimension() * sizeof(float),
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)}
-    , renderer_{device,
+    , renderer_{heightmap,
+          device,
           renderer,
           color_image,
           depth_buffer,
-          &heightmap_buffer_,
           terrain_dimension_,
           chunk_dimension_}
 
 {
-    fill_heightmap(heightmap, renderer);
-
     generate_chunks(chunk_registry_,
         *physics_engine_,
         heightmap,
@@ -170,7 +164,7 @@ soil::terrain::terrain(heightmap const& heightmap,
         chunk_dimension_);
 }
 
-soil::terrain::~terrain() { destroy(device_, &heightmap_buffer_); }
+soil::terrain::~terrain() { }
 
 void soil::terrain::update(soil::perspective_camera const& camera,
     [[maybe_unused]] float delta_time)
@@ -199,31 +193,11 @@ void soil::terrain::draw(VkImageView target_image,
 
 void soil::terrain::draw_imgui()
 {
+    ImGui::ShowMetricsWindow();
+
     ImGui::Begin("Terrain");
     ImGui::SliderInt("LOD", &lod_, 0, renderer_.lod_levels());
     ImGui::End();
 
     renderer_.draw_imgui();
-}
-
-void soil::terrain::fill_heightmap(heightmap const& heightmap,
-    vkrndr::vulkan_renderer* const renderer)
-{
-    vkrndr::vulkan_buffer staging_buffer{vkrndr::create_buffer(device_,
-        heightmap_buffer_.size,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
-
-    vkrndr::mapped_memory staging_map{
-        vkrndr::map_memory(device_, staging_buffer.allocation)};
-
-    auto values{heightmap.data()};
-    assert(values.size_bytes() == heightmap_buffer_.size);
-    memcpy(staging_map.as<void>(), values.data(), values.size_bytes());
-    unmap_memory(device_, &staging_map);
-
-    renderer->transfer_buffer(staging_buffer, heightmap_buffer_);
-
-    destroy(device_, &staging_buffer);
 }

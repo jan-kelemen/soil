@@ -59,10 +59,6 @@ namespace soil
         terrain& operator=(terrain&&) noexcept = delete;
 
     private:
-        void fill_heightmap(heightmap const& heightmap,
-            vkrndr::vulkan_renderer* renderer);
-
-    private:
         physics_engine* physics_engine_;
         vkrndr::vulkan_device* device_;
 
@@ -70,8 +66,6 @@ namespace soil
 
         uint32_t terrain_dimension_;
         uint32_t chunk_dimension_;
-
-        vkrndr::vulkan_buffer heightmap_buffer_;
 
         terrain_renderer renderer_;
 

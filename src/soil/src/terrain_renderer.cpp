@@ -1,5 +1,6 @@
 #include <terrain_renderer.hpp>
 
+#include <heightmap.hpp>
 #include <noise.hpp>
 #include <perspective_camera.hpp>
 
@@ -20,6 +21,8 @@
 #include <glm/mat4x4.hpp>
 
 #include <imgui.h>
+
+#include <spdlog/spdlog.h>
 
 #include <array>
 #include <cmath>
@@ -130,14 +133,21 @@ namespace
         heightmap_storage_binding.descriptorCount = 1;
         heightmap_storage_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+        VkDescriptorSetLayoutBinding normals_storage_binding{};
+        normals_storage_binding.binding = 3;
+        normals_storage_binding.descriptorType =
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        normals_storage_binding.descriptorCount = 1;
+        normals_storage_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
         VkDescriptorSetLayoutBinding textures_binding{};
-        textures_binding.binding = 3;
+        textures_binding.binding = 4;
         textures_binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         textures_binding.descriptorCount = 1;
         textures_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutBinding texture_sampler_binding{};
-        texture_sampler_binding.binding = 4;
+        texture_sampler_binding.binding = 5;
         texture_sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
         texture_sampler_binding.descriptorCount = 1;
         texture_sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -145,6 +155,7 @@ namespace
         std::array const bindings{camera_uniform_binding,
             chunk_uniform_binding,
             heightmap_storage_binding,
+            normals_storage_binding,
             textures_binding,
             texture_sampler_binding};
 
@@ -167,6 +178,7 @@ namespace
         VkDescriptorBufferInfo const camera_uniform_info,
         VkDescriptorBufferInfo const chunk_uniform_info,
         VkDescriptorBufferInfo const heightmap_storage_info,
+        VkDescriptorBufferInfo const normals_storage_info,
         std::span<VkDescriptorImageInfo const> const textures_info,
         VkDescriptorImageInfo const texture_sampler_info)
     {
@@ -198,10 +210,20 @@ namespace
         heightmap_uniform_write.descriptorCount = 1;
         heightmap_uniform_write.pBufferInfo = &heightmap_storage_info;
 
+        VkWriteDescriptorSet normals_uniform_write{};
+        normals_uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        normals_uniform_write.dstSet = descriptor_set;
+        normals_uniform_write.dstBinding = 3;
+        normals_uniform_write.dstArrayElement = 0;
+        normals_uniform_write.descriptorType =
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        normals_uniform_write.descriptorCount = 1;
+        normals_uniform_write.pBufferInfo = &normals_storage_info;
+
         VkWriteDescriptorSet textures_write{};
         textures_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         textures_write.dstSet = descriptor_set;
-        textures_write.dstBinding = 3;
+        textures_write.dstBinding = 4;
         textures_write.dstArrayElement = 0;
         textures_write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         textures_write.descriptorCount =
@@ -211,7 +233,7 @@ namespace
         VkWriteDescriptorSet texture_sampler_write{};
         texture_sampler_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         texture_sampler_write.dstSet = descriptor_set;
-        texture_sampler_write.dstBinding = 4;
+        texture_sampler_write.dstBinding = 5;
         texture_sampler_write.dstArrayElement = 0;
         texture_sampler_write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
         texture_sampler_write.descriptorCount = 1;
@@ -220,6 +242,7 @@ namespace
         std::array const descriptor_writes{camera_uniform_write,
             chunk_uniform_write,
             heightmap_uniform_write,
+            normals_uniform_write,
             textures_write,
             texture_sampler_write};
 
@@ -231,11 +254,11 @@ namespace
     }
 } // namespace
 
-soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
+soil::terrain_renderer::terrain_renderer(heightmap const& heightmap,
+    vkrndr::vulkan_device* const device,
     vkrndr::vulkan_renderer* const renderer,
     vkrndr::vulkan_image* const color_image,
     vkrndr::vulkan_image* const depth_buffer,
-    vkrndr::vulkan_buffer const* const heightmap_buffer,
     uint32_t const terrain_dimension,
     uint32_t const chunk_dimension)
     : device_{device}
@@ -246,6 +269,14 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
     , chunk_dimension_{chunk_dimension}
     , chunks_per_dimension_{(terrain_dimension_ - 1) / (chunk_dimension_ - 1) +
           1}
+    , heightmap_buffer_{create_buffer(device,
+          heightmap.dimension() * heightmap.dimension() * sizeof(float),
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)}
+    , normal_buffer_{create_buffer(device,
+          heightmap.dimension() * heightmap.dimension() * sizeof(glm::vec4),
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)}
     , texture_mix_image_{create_texture_mix_image()}
     , texture_sampler_{create_texture_sampler(device_,
           texture_mix_image_.mip_levels)}
@@ -256,6 +287,9 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)}
     , descriptor_set_layout_{create_descriptor_set_layout(device_)}
 {
+    fill_heightmap(heightmap);
+    fill_normals(heightmap);
+
     fill_vertex_buffer();
 
     auto const max_lod{static_cast<uint32_t>(round(log2(chunk_dimension))) + 1};
@@ -268,7 +302,8 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
         vkrndr::vulkan_pipeline_builder{device_,
             vkrndr::vulkan_pipeline_layout_builder{device_}
                 .add_descriptor_set_layout(descriptor_set_layout_)
-                .add_push_constants({.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                .add_push_constants({.stageFlags = VK_SHADER_STAGE_VERTEX_BIT |
+                        VK_SHADER_STAGE_FRAGMENT_BIT,
                     .offset = 0,
                     .size = sizeof(push_constants)})
                 .build(),
@@ -332,9 +367,12 @@ soil::terrain_renderer::terrain_renderer(vkrndr::vulkan_device* const device,
             VkDescriptorBufferInfo{.buffer = data.chunk_uniform.buffer,
                 .offset = 0,
                 .range = chunk_uniform_buffer_size},
-            VkDescriptorBufferInfo{.buffer = heightmap_buffer->buffer,
+            VkDescriptorBufferInfo{.buffer = heightmap_buffer_.buffer,
                 .offset = 0,
-                .range = heightmap_buffer->size},
+                .range = heightmap_buffer_.size},
+            VkDescriptorBufferInfo{.buffer = normal_buffer_.buffer,
+                .offset = 0,
+                .range = normal_buffer_.size},
             texture_info,
             sampler_info);
     }
@@ -373,6 +411,9 @@ soil::terrain_renderer::~terrain_renderer()
     vkDestroySampler(device_->logical, texture_sampler_, nullptr);
 
     destroy(device_, &texture_mix_image_);
+
+    destroy(device_, &normal_buffer_);
+    destroy(device_, &heightmap_buffer_);
 }
 
 void soil::terrain_renderer::update(soil::perspective_camera const& camera)
@@ -407,12 +448,13 @@ vkrndr::render_pass_guard soil::terrain_renderer::begin_render_pass(
         0,
         std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
 
-    VkDeviceSize const zero_offset{0};
+    VkDeviceSize const zero_offset{};
     vkCmdBindVertexBuffers(command_buffer,
         0,
         1,
         &vertex_buffer_.buffer,
         &zero_offset);
+
     return guard;
 }
 
@@ -436,7 +478,7 @@ void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
 
         vkCmdPushConstants(command_buffer,
             *pipeline_->pipeline_layout,
-            VK_SHADER_STAGE_VERTEX_BIT,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             0,
             sizeof(push_constants),
             &constants);
@@ -452,7 +494,94 @@ void soil::terrain_renderer::draw(VkCommandBuffer command_buffer,
 
 void soil::terrain_renderer::end_render_pass() { frame_data_.cycle(); }
 
-void soil::terrain_renderer::draw_imgui() { ImGui::ShowMetricsWindow(); }
+void soil::terrain_renderer::draw_imgui() { }
+
+void soil::terrain_renderer::fill_heightmap(heightmap const& heightmap)
+{
+    vkrndr::vulkan_buffer staging_buffer{vkrndr::create_buffer(device_,
+        heightmap_buffer_.size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+
+    vkrndr::mapped_memory staging_map{
+        vkrndr::map_memory(device_, staging_buffer.allocation)};
+
+    auto values{heightmap.data()};
+    assert(values.size_bytes() == heightmap_buffer_.size);
+    memcpy(staging_map.as<void>(), values.data(), values.size_bytes());
+    unmap_memory(device_, &staging_map);
+
+    renderer_->transfer_buffer(staging_buffer, heightmap_buffer_);
+
+    destroy(device_, &staging_buffer);
+}
+
+void soil::terrain_renderer::fill_normals(heightmap const& heightmap)
+{
+    vkrndr::vulkan_buffer staging_buffer{vkrndr::create_buffer(device_,
+        normal_buffer_.size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+
+    vkrndr::mapped_memory staging_map{
+        vkrndr::map_memory(device_, staging_buffer.allocation)};
+
+    auto values{heightmap.data()};
+
+    auto const face_normal = [](glm::vec3 const& point1,
+                                 glm::vec3 const& point2,
+                                 glm::vec3 const& point3)
+    {
+        glm::vec3 const edge1{point2 - point1};
+        glm::vec3 const edge2{point3 - point1};
+
+        // https://stackoverflow.com/a/57812028
+        return glm::normalize(glm::cross(edge1, edge2));
+    };
+
+    memset(staging_map.as<void>(), 0, normal_buffer_.size);
+
+    auto* const normals{staging_map.as<glm::vec4>()};
+    for (uint32_t z{}; z != terrain_dimension_ - 1; ++z)
+    {
+        for (uint32_t x{}; x != terrain_dimension_ - 1; ++x)
+        {
+            auto const base_vertex{
+                cppext::narrow<uint32_t>(z * terrain_dimension_ + x)};
+
+            auto const fn1 = face_normal({x, heightmap.value(x, z), z},
+                {x, heightmap.value(x, z + 1), z + 1},
+                {x + 1, heightmap.value(x + 1, z), z});
+            normals[base_vertex] += glm::vec4{fn1, 0.0f};
+            normals[cppext::narrow<uint32_t>(
+                base_vertex + terrain_dimension_)] += glm::vec4{fn1, 0.0f};
+            normals[base_vertex + 1] += glm::vec4{fn1, 0.0f};
+
+            auto const fn2 = face_normal({x + 1, heightmap.value(x + 1, z), z},
+                {x, heightmap.value(x, z + 1), z + 1},
+                {x + 1, heightmap.value(x + 1, z + 1), z + 1});
+
+            normals[base_vertex + 1] += glm::vec4{fn2, 0.0f};
+            normals[cppext::narrow<uint32_t>(
+                base_vertex + terrain_dimension_)] += glm::vec4{fn2, 0.0f};
+            normals[cppext::narrow<uint32_t>(
+                base_vertex + terrain_dimension_ + 1)] += glm::vec4{fn2, 0.0f};
+        }
+    }
+
+    for (size_t i{}; i != normal_buffer_.size / sizeof(glm::vec4); ++i)
+    {
+        normals[i] = glm::normalize(normals[i]);
+    }
+
+    unmap_memory(device_, &staging_map);
+
+    renderer_->transfer_buffer(staging_buffer, normal_buffer_);
+
+    destroy(device_, &staging_buffer);
+}
 
 vkrndr::vulkan_image soil::terrain_renderer::create_texture_mix_image()
 {

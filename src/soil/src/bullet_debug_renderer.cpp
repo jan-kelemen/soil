@@ -295,37 +295,41 @@ void soil::bullet_debug_renderer::draw(VkImageView target_image,
     VkCommandBuffer command_buffer,
     VkRect2D const render_area)
 {
-    vkrndr::render_pass render_pass;
-
-    render_pass.with_color_attachment(VK_ATTACHMENT_LOAD_OP_LOAD,
-        VK_ATTACHMENT_STORE_OP_STORE,
-        target_image,
-        std::nullopt,
-        color_image_->view);
-    render_pass.with_depth_attachment(VK_ATTACHMENT_LOAD_OP_LOAD,
-        VK_ATTACHMENT_STORE_OP_STORE,
-        depth_buffer_->view);
-
+    if (frame_data_->vertex_count > 0)
     {
-        // cppcheck-suppress unreadVariable
-        auto const guard{render_pass.begin(command_buffer, render_area)};
+        vkrndr::render_pass render_pass;
 
-        VkDeviceSize const zero_offset{0};
-        vkCmdBindVertexBuffers(command_buffer,
-            0,
-            1,
-            &frame_data_->vertex_buffer.buffer,
-            &zero_offset);
+        render_pass.with_color_attachment(VK_ATTACHMENT_LOAD_OP_LOAD,
+            VK_ATTACHMENT_STORE_OP_STORE,
+            target_image,
+            std::nullopt,
+            color_image_->view);
+        render_pass.with_depth_attachment(VK_ATTACHMENT_LOAD_OP_LOAD,
+            VK_ATTACHMENT_STORE_OP_STORE,
+            depth_buffer_->view);
 
-        vkrndr::bind_pipeline(command_buffer,
-            *line_pipeline_,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            0,
-            std::span<VkDescriptorSet const>{&frame_data_->descriptor_set, 1});
+        {
+            // cppcheck-suppress unreadVariable
+            auto const guard{render_pass.begin(command_buffer, render_area)};
 
-        vkCmdSetLineWidth(command_buffer, 4.0f);
+            VkDeviceSize const zero_offset{0};
+            vkCmdBindVertexBuffers(command_buffer,
+                0,
+                1,
+                &frame_data_->vertex_buffer.buffer,
+                &zero_offset);
 
-        vkCmdDraw(command_buffer, frame_data_->vertex_count, 1, 0, 0);
+            vkrndr::bind_pipeline(command_buffer,
+                *line_pipeline_,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                0,
+                std::span<VkDescriptorSet const>{&frame_data_->descriptor_set,
+                    1});
+
+            vkCmdSetLineWidth(command_buffer, 4.0f);
+
+            vkCmdDraw(command_buffer, frame_data_->vertex_count, 1, 0, 0);
+        }
     }
 
     frame_data_.cycle([](auto const&, auto& next) { next.vertex_count = 0; });

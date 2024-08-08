@@ -27,6 +27,7 @@ namespace vkrndr
 
 namespace soil
 {
+    class heightmap;
     class perspective_camera;
 } // namespace soil
 
@@ -40,11 +41,11 @@ namespace soil
     class [[nodiscard]] terrain_renderer final
     {
     public:
-        terrain_renderer(vkrndr::vulkan_device* device,
+        terrain_renderer(heightmap const& heightmap,
+            vkrndr::vulkan_device* device,
             vkrndr::vulkan_renderer* renderer,
             vkrndr::vulkan_image* color_image,
             vkrndr::vulkan_image* depth_buffer,
-            vkrndr::vulkan_buffer const* heightmap_buffer,
             uint32_t terrain_dimension,
             uint32_t chunk_dimension);
 
@@ -99,6 +100,10 @@ namespace soil
         };
 
     private:
+        void fill_heightmap(heightmap const& heightmap);
+
+        void fill_normals(heightmap const& heightmap);
+
         [[nodiscard]] vkrndr::vulkan_image create_texture_mix_image();
 
         void fill_vertex_buffer();
@@ -114,6 +119,9 @@ namespace soil
         uint32_t terrain_dimension_;
         uint32_t chunk_dimension_;
         uint32_t chunks_per_dimension_;
+
+        vkrndr::vulkan_buffer heightmap_buffer_;
+        vkrndr::vulkan_buffer normal_buffer_;
 
         vkrndr::vulkan_image texture_mix_image_;
         VkSampler texture_sampler_;

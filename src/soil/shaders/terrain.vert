@@ -27,9 +27,14 @@ layout(std430, binding = 2) readonly buffer Heightmap {
     float heights[];
 } heightmap;
 
+layout(std430, binding = 3) readonly buffer NormalBuffer {
+    vec4 normals[];
+} normal;
+
 layout(location = 0) out vec3 outFragPosition;
-layout(location = 1) out vec2 outGlobalUV;
-layout(location = 2) out vec2 outUV;
+layout(location = 1) out vec3 outNormal;
+layout(location = 2) out vec2 outGlobalUV;
+layout(location = 3) out vec2 outUV;
 
 uvec2 globalPosition() {
     uint chunkY = pushConsts.chunk / pushConsts.chunksPerDimension;
@@ -41,13 +46,16 @@ uvec2 globalPosition() {
 void main() {
     uvec2 globalPos = globalPosition();
 
-    vec4 vertex = vec4(inChunkPosition.x, heightmap.heights[globalPos.y * pushConsts.terrainDimension + globalPos.x], inChunkPosition.y, 1.0);
-    mat4 model = chunks.chunks[pushConsts.chunk].model;
+    uint vertexIndex = globalPos.y * pushConsts.terrainDimension + globalPos.x;
+    vec4 vertex = vec4(inChunkPosition.x, heightmap.heights[vertexIndex], inChunkPosition.y, 1.0);
 
+    mat4 model = chunks.chunks[pushConsts.chunk].model;
     vec4 worldPosition = model * vertex;
 
     gl_Position = camera.projection * camera.view * worldPosition;
+
     outFragPosition = vec3(globalPos.x, vertex.y, globalPos.y);
+    outNormal = (model * normal.normals[vertexIndex]).xyz;
     outGlobalUV = vec2(float(globalPos.x) / pushConsts.terrainDimension, float(globalPos.y) / pushConsts.terrainDimension);
     outUV = vec2(float(inChunkPosition.x) / (pushConsts.chunkDimension - 1), float(inChunkPosition.y) / (pushConsts.chunkDimension - 1));
 }
