@@ -3,8 +3,6 @@
 
 #include <terrain_renderer.hpp>
 
-#include <vulkan_buffer.hpp>
-
 #include <entt/entt.hpp>
 
 #include <vulkan/vulkan_core.h>
@@ -42,7 +40,7 @@ namespace soil
         terrain(terrain&&) noexcept = delete;
 
     public:
-        ~terrain();
+        ~terrain() = default;
 
     public:
         void update(soil::perspective_camera const& camera, float delta_time);
@@ -65,7 +63,7 @@ namespace soil
         entt::registry chunk_registry_;
 
         uint32_t terrain_dimension_;
-        uint32_t chunk_dimension_;
+        uint32_t chunk_dimension_{65};
 
         terrain_renderer renderer_;
 

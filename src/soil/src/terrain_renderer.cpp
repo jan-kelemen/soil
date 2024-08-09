@@ -18,15 +18,16 @@
 #include <vulkan_renderer.hpp>
 #include <vulkan_utility.hpp>
 
+#include <glm/geometric.hpp>
 #include <glm/mat4x4.hpp>
-
-#include <imgui.h>
-
-#include <spdlog/spdlog.h>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 #include <array>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstring>
 #include <iterator>
 #include <optional>
 #include <ranges>
@@ -527,8 +528,6 @@ void soil::terrain_renderer::fill_normals(heightmap const& heightmap)
 
     vkrndr::mapped_memory staging_map{
         vkrndr::map_memory(device_, staging_buffer.allocation)};
-
-    auto values{heightmap.data()};
 
     auto const face_normal = [](glm::vec3 const& point1,
                                  glm::vec3 const& point2,

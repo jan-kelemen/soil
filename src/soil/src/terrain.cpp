@@ -6,10 +6,6 @@
 
 #include <cppext_numeric.hpp>
 
-#include <vulkan_buffer.hpp>
-#include <vulkan_memory.hpp>
-#include <vulkan_renderer.hpp>
-
 #include <BulletCollision/CollisionShapes/btCollisionShape.h> // IWYU pragma: keep
 #include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
 #include <BulletDynamics/Dynamics/btRigidBody.h>
@@ -22,12 +18,10 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
-#include <cassert>
 #include <cstring>
 #include <limits>
 #include <memory>
 #include <ranges>
-#include <span>
 #include <utility>
 #include <vector>
 
@@ -147,7 +141,6 @@ soil::terrain::terrain(heightmap const& heightmap,
     : physics_engine_{physics_engine}
     , device_{device}
     , terrain_dimension_{cppext::narrow<uint32_t>(heightmap.dimension())}
-    , chunk_dimension_{65}
     , renderer_{heightmap,
           device,
           renderer,
@@ -163,8 +156,6 @@ soil::terrain::terrain(heightmap const& heightmap,
         terrain_dimension_,
         chunk_dimension_);
 }
-
-soil::terrain::~terrain() { }
 
 void soil::terrain::update(soil::perspective_camera const& camera,
     [[maybe_unused]] float delta_time)
