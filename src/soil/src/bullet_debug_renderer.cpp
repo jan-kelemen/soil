@@ -171,7 +171,8 @@ soil::bullet_debug_renderer::bullet_debug_renderer(
         data.vertex_buffer = vkrndr::create_buffer(device_,
             vertex_buffer_size,
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         data.vertex_map =
             vkrndr::map_memory(device, data.vertex_buffer.allocation);

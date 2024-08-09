@@ -45,7 +45,7 @@ namespace
 
         VkDescriptorPoolSize storage_buffer_pool_size{};
         storage_buffer_pool_size.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        storage_buffer_pool_size.descriptorCount = 3 * count;
+        storage_buffer_pool_size.descriptorCount = 6 * count;
 
         VkDescriptorPoolSize texture_sampler_pool_size{};
         texture_sampler_pool_size.type =
