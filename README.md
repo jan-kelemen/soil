@@ -1,5 +1,7 @@
 # soil [![GitHub Build status](https://github.com/jan-kelemen/soil/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/jan-kelemen/soil/actions/workflows/ci.yml)
 
+Terrain renderer using Bullet3 for physics simulation and Vulkan API for rendering. Blog post: [Rendering Medvednica From a Heightmap](https://jan-kelemen.github.io/2024/08/10/rendering-medvednica-from-heightmap.html)
+
 ## Building
 Necessary build tools are:
 * CMake 3.27 or higher
